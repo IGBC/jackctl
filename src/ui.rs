@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use gtk::prelude::*;
-use gtk::{Window, Label, Image, Button, LevelBar, Notebook, Grid, CheckButton, Align};
+use gtk::{Window, Label, Image, Button, LevelBar, Notebook, Grid, CheckButton, Align, Separator, Orientation};
 use gtk::Builder;
 use gtk::Application;
 use glib::signal::SignalHandlerId;
@@ -131,22 +131,39 @@ impl MainDialog {
                 self.tabs.insert_page(&l, Some(&Label::new(Some("Matrix"))), Some(0));
             } else {
                 let grid = grid();
+                let i_groups = model.inputs().no_groups();
+                let o_groups = model.outputs().no_groups();
+                let n_inputs = model.inputs().len();
+                let n_outputs = model.outputs().len();
+                let max_x: i32 = 2 + i_groups as i32 + n_inputs as i32 - 1;
+                let max_y: i32 = 2 + o_groups as i32 + n_outputs as i32 - 1;
+
                 let mut curr_x = 2;
-                for g in model.inputs().iter() {
+                for (i, g) in model.inputs().iter().enumerate() {
                     grid.attach(&grid_label(g.name(), true), curr_x, 0, g.len() as i32, 1);
                     
                     for n in g.iter() {
                         grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
                         curr_x += 1;
                     }
+
+                    if i < i_groups -1 {
+                        grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
+                        curr_x += 1;
+                    }
                 }
     
                 let mut curr_y = 2;
-                for g in model.outputs().iter() {
+                for (i, g) in model.outputs().iter().enumerate() {
                     grid.attach(&grid_label(g.name(), false), 0, curr_y, 1, g.len() as i32);
                     
                     for n in g.iter() {
                         grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
+                        curr_y += 1;
+                    }
+
+                    if i < o_groups -1 {
+                        grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_y, max_x, 1);
                         curr_y += 1;
                     }
                 }
@@ -166,10 +183,14 @@ impl MainDialog {
                                 y_vec.push((cb, handler));
                                 curr_y += 1;
                             }
+                            // skip over the separator;
+                            curr_y += 1;
                         }
                         x_vec.push(y_vec);
                         curr_x += 1;
                     }
+                    // skip over the separator
+                    curr_x += 1;
                 }       
                 
                 self.matrix = x_vec;
