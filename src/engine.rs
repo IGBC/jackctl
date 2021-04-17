@@ -6,7 +6,7 @@ use gtk::prelude::*;
 use jack::Client as JackClient;
 use jack::PortFlags;
 
-use crate::model::Model;
+use crate::model::{Model, Connection};
 
 pub struct Controller {
     model: Model,
@@ -30,9 +30,29 @@ impl Controller {
         this
     }
 
-    pub fn connect_ports(&self, group1: &str, port1: &str, group2: &str, port2: &str, connect: bool) -> bool {
-        println!("connect: {}:{} -> {}:{}", group1, port1, group2, port2);
-        false
+    pub fn connect_ports(&self, portid1: usize, portid2: usize, connect: bool) -> bool {
+        let model = self.model.borrow();
+        let input = model.inputs().get_port_name_by_id(portid2);
+        let output = model.outputs().get_port_name_by_id(portid1);
+        if input.is_none() || output.is_none() {
+            println!("Cannot Connect: {:?} to {:?}", output, input);
+            !connect
+        } else {
+            let input = input.unwrap();
+            let output = output.unwrap();
+            let result = if connect {
+                self.interface.connect_ports_by_name(&output, &input)
+            } else {
+                self.interface.disconnect_ports_by_name(&output, &input)
+            };
+            match result {
+                Ok(()) => connect,
+                Err(e) => {
+                    println!("Connection Error: {}", e);
+                    !connect
+                }
+            }
+        }
     }
 
     pub fn update_ui(&mut self) {
@@ -46,14 +66,33 @@ impl Controller {
         let inputs = self.interface.ports(None, None, PortFlags::IS_INPUT);
         if inputs != self.old_inputs {
             model.update_inputs(&inputs);
-            self.old_inputs = inputs;
+            self.old_inputs = inputs.clone();
         }
         
         let outputs = self.interface.ports(None, None, PortFlags::IS_OUTPUT);
         if outputs != self.old_outputs {
             model.update_outputs(&outputs);
-            self.old_outputs = outputs;
+            self.old_outputs = outputs.clone();
         }
+
+        let mut connections = Vec::new();
+        for o in outputs.iter() {
+            let output = self.interface.port_by_name(&o).expect("should always exist");
+            for i in inputs.iter() {
+                match output.is_connected_to(&i) {
+                    Ok(true) => {
+                        let c = Connection {
+                            input: i.to_owned(),
+                            output: o.to_owned(),
+                        };
+                        connections.push(c);
+                    },
+                    _ => (),
+                }
+            }
+        }
+
+        model.update_connections(connections);
 
 
         // println!("{:?}", self.get_all_ports());

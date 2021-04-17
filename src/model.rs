@@ -14,7 +14,16 @@ pub struct Group {
     ports: Vec<Port>,
 }
 
-pub type Port = String;
+pub struct Port {
+    portname: String,
+    id: usize,
+}
+
+#[derive(Debug)]
+pub struct Connection {
+    pub input: String,
+    pub output: String,
+}
 
 #[derive(Default)]
 pub struct ModelInner {
@@ -28,6 +37,7 @@ pub struct ModelInner {
 
     inputs: PortGroup,
     outputs: PortGroup,
+    connections: Vec<Connection>,
 }
 
 impl ModelInner {
@@ -52,11 +62,7 @@ impl ModelInner {
         let mut map: PortGroup = PortGroup::default();
 
         for p in ports.iter() {
-            let mut parts: Vec<&str> = p.split(':').collect();
-            let group: &str = parts.remove(0);
-            let name = parts.join(":");
-            
-            map.add(group.to_owned(), name);
+            map.add(p);
         }
 
         map
@@ -78,6 +84,26 @@ impl ModelInner {
 
     pub fn outputs(&self) -> &PortGroup {
         &self.outputs
+    }
+
+    pub fn update_connections(&mut self, connections: Vec<Connection>) {
+        self.connections = connections;
+    }
+
+    pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
+        let output_name = self.outputs.get_port_name_by_id(id1);
+        let input_name = self.inputs.get_port_name_by_id(id2);
+        if output_name.is_none() || input_name.is_none() {
+            return false;
+        }
+        let output_name = output_name.unwrap();
+        let input_name = input_name.unwrap();
+        for c in self.connections.iter() {
+            if (c.input == input_name) && (c.output == output_name) {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -103,9 +129,23 @@ impl Group {
     }
 }
 
+impl Port {
+    pub fn name(&self) -> &str { &self.portname }
+    pub fn id(&self) -> usize { self.id }
+}
+
 
 impl PortGroup {
-    pub fn add(&mut self, group: String, port: Port) {
+    pub fn add(&mut self, name: &str) {
+        let mut parts: Vec<&str> = name.split(':').collect();
+        let group: String = parts.remove(0).to_owned();
+        let portname = parts.join(":");
+
+        let port = Port {
+            portname,
+            id: self.len(),
+        };
+
         let g: &mut Group = match self.groups.iter().position( |r| r.name() == &group) {
             Some(i) => &mut self.groups[i],
             None    => {
@@ -131,5 +171,16 @@ impl PortGroup {
 
     pub fn iter(&self) -> std::slice::Iter<'_, Group> {
         self.groups.iter()
+    }
+
+    pub fn get_port_name_by_id(&self, id: usize) -> Option<String> {
+        for g in self.groups.iter() {
+            for p in g.iter() {
+                if p.id() == id {
+                    return Some([g.name(),p.name()].join(":"));
+                }
+            }
+        }
+        None
     }
 }

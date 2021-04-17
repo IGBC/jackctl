@@ -5,15 +5,16 @@ use gtk::prelude::*;
 use gtk::{Window, Label, Image, Button, LevelBar, Notebook, Grid, CheckButton, Align};
 use gtk::Builder;
 use gtk::Application;
+use glib::signal::SignalHandlerId;
 
-use crate::model::Model;
+use crate::model::{Model, ModelInner, Port};
 use crate::engine::Controller;
 
 pub struct MainDialog {
     state: Model,
     controller: Rc<RefCell<Controller>>,
 
-    builder: Builder,
+    //builder: Builder,
     window:  Window,
     xruns_label: Label,
     xruns_icon: Image,
@@ -23,7 +24,8 @@ pub struct MainDialog {
     performance_frames: Label,
     performance_latency: Label,
     tabs: Notebook,
-    matrix_tab: gtk::Box,
+    
+    matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
 }
 
 fn get_object<T>(builder: &Builder, name: &str) -> T 
@@ -34,7 +36,7 @@ where T: gtk::prelude::IsA<glib::object::Object> {
 
 pub fn init_ui(state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<MainDialog>> {
     // define the gtk application with a unique name and default parameters
-    let application = Application::new(Some("The.name.goes.here"), Default::default())
+    let _application = Application::new(Some("The.name.goes.here"), Default::default())
     .expect("Initialization failed");
 
     // this registers a closure (executing our setup_gui function) 
@@ -78,13 +80,12 @@ impl MainDialog {
 
         // Setup notebook view
         let tabs = get_object(&builder, "tabs.maindialog");
-        let matrix_tab = get_object(&builder, "matrix.tabs.maindialog");
-
+        
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,
             controller,
-            builder,
+            //builder,
             window: window.clone(),
             xruns_label,
             xruns_icon,
@@ -94,12 +95,12 @@ impl MainDialog {
             performance_frames,
             performance_latency,
             tabs,
-            matrix_tab,
+            matrix: Vec::new(),
         }));
 
         // hookup the update function
         let this_clone = this.clone();
-        window.connect_draw(move |_,_|{this_clone.borrow().update_ui()});
+        window.connect_draw(move |_,_|{this_clone.borrow_mut().update_ui()});
         
         this
     }
@@ -108,7 +109,7 @@ impl MainDialog {
         self.window.show_all();
     }
 
-    pub fn update_ui(&self) -> gtk::Inhibit {
+    pub fn update_ui(&mut self) -> gtk::Inhibit {
         let mut model = self.state.borrow_mut();
         self.xruns_label.set_markup(&format!("{} XRuns", model.xruns()));
         
@@ -135,7 +136,7 @@ impl MainDialog {
                     grid.attach(&grid_label(g.name(), true), curr_x, 0, g.len() as i32, 1);
                     
                     for n in g.iter() {
-                        grid.attach(&grid_label(n, true), curr_x, 1, 1, 1);
+                        grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
                         curr_x += 1;
                     }
                 }
@@ -145,27 +146,33 @@ impl MainDialog {
                     grid.attach(&grid_label(g.name(), false), 0, curr_y, 1, g.len() as i32);
                     
                     for n in g.iter() {
-                        grid.attach(&grid_label(n, false), 1, curr_y, 1, 1);
+                        grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
                         curr_y += 1;
                     }
                 }
 
                 let mut curr_x = 2;
+                let mut x_vec = Vec::new();
                 for g2 in model.inputs().iter() {
                     for n2 in g2.iter() {
                         let mut curr_y = 2;
+                        let mut y_vec = Vec::new();
                         for g1 in model.outputs().iter() {
                             for n1 in g1.iter() {
                                 
-                                let cb = self.grid_checkbox(g1.name(), n1, g2.name(), n2);
+                                let (cb, handler) = self.grid_checkbox(n1, n2, &model);
                                 grid.attach(&cb, curr_x, curr_y, 1, 1);
                                 
+                                y_vec.push((cb, handler));
                                 curr_y += 1;
                             }
                         }
+                        x_vec.push(y_vec);
                         curr_x += 1;
                     }
-                }                
+                }       
+                
+                self.matrix = x_vec;
     
                 self.tabs.remove_page(Some(0));
                 self.tabs.insert_page(&grid, Some(&Label::new(Some("Matrix"))), Some(0));    
@@ -177,22 +184,31 @@ impl MainDialog {
 
         }
 
+        for (i, col) in self.matrix.iter().enumerate() {
+            for (j, (item, handle)) in col.iter().enumerate() {
+                item.block_signal(handle);
+                item.set_active(model.connected_by_id(j, i));
+                item.unblock_signal(handle); 
+            }
+        } 
+
         gtk::Inhibit(false)
     }
 
-    fn grid_checkbox(&self, group1: &str, port1: &str, group2: &str, port2: &str) -> CheckButton {
+    fn grid_checkbox(&self, port1: &Port, port2: &Port, model: &ModelInner) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
+        button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
         button.set_margin_start(5);
         button.set_margin_bottom(5);
         button.set_margin_end(5);
         let clone = self.controller.clone();
-        let group1_c = group1.to_owned();
-        let group2_c = group2.to_owned();
-        let port1_c = port1.to_owned();
-        let port2_c = port2.to_owned();
-        button.connect_toggled( move | cb | cb.set_active(clone.borrow().connect_ports("", "", "", "", cb.get_active())));
-        button   
+        let id1 = port1.id();
+        let id2 = port2.id();
+        let signal_id = button.connect_clicked( move | cb | { 
+            clone.borrow().connect_ports(id1, id2, cb.get_active()); 
+        });
+        (button, signal_id)   
     }
 
 }
