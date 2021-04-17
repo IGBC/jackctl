@@ -11,4 +11,5 @@ fn main() {
     let window = ui::init_ui(model.clone(),controller.clone());
     window.borrow().show();
     gtk::main();
+    println!("Jackctl Exiting, Goodbye");
 }

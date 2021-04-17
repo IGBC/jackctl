@@ -81,6 +81,16 @@ impl MainDialog {
         // Setup notebook view
         let tabs = get_object(&builder, "tabs.maindialog");
         
+        // Setup about screen
+        let about:Window = get_object(&builder, "aboutdialog");
+
+        // Setup Main Menu
+        let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
+        quit.connect_clicked(|_| gtk::main_quit());
+        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
+        aboutbutton.connect_clicked( move |_| about.show_all());
+
+
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,

@@ -1776,6 +1776,9 @@
                     <property name="can-focus">False</property>
                     <property name="halign">center</property>
                     <property name="vexpand">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="value">0.56</property>
+                    <property name="inverted">True</property>
                   </object>
                   <packing>
                     <property name="left-attach">2</property>
@@ -1809,6 +1812,9 @@
                     <property name="can-focus">False</property>
                     <property name="halign">center</property>
                     <property name="vexpand">True</property>
+                    <property name="orientation">vertical</property>
+                    <property name="value">0.39</property>
+                    <property name="inverted">True</property>
                   </object>
                   <packing>
                     <property name="left-attach">0</property>
