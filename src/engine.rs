@@ -11,16 +11,16 @@ use crate::model::{Model, Connection};
 pub struct Controller {
     model: Model,
     interface: JackClient,
-    old_inputs: Vec<String>,
-    old_outputs: Vec<String>,
+    old_audio_inputs: Vec<String>,
+    old_audio_outputs: Vec<String>,
 }
 
 impl Controller {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
         let this = Rc::new(RefCell::new(Controller {
             model: model,
-            old_inputs: Vec::new(),
-            old_outputs: Vec::new(),
+            old_audio_inputs: Vec::new(),
+            old_audio_outputs: Vec::new(),
             interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER).unwrap().0,
         }));
         this.borrow_mut().update_ui();
@@ -64,15 +64,17 @@ impl Controller {
         model.latency = self.interface.frames_to_time(1) / 1000;
 
         let inputs = self.interface.ports(None, None, PortFlags::IS_INPUT);
-        if inputs != self.old_inputs {
-            model.update_inputs(&inputs);
-            self.old_inputs = inputs.clone();
+        let (ap, mp) = self.split_midi_ports(inputs.clone());
+        if ap != self.old_audio_inputs {
+            model.update_inputs(&ap);
+            self.old_audio_inputs = ap;
         }
         
         let outputs = self.interface.ports(None, None, PortFlags::IS_OUTPUT);
-        if outputs != self.old_outputs {
-            model.update_outputs(&outputs);
-            self.old_outputs = outputs.clone();
+        let (ap, mp) = self.split_midi_ports(outputs.clone());
+        if ap != self.old_audio_outputs {
+            model.update_outputs(&ap);
+            self.old_audio_outputs = ap;
         }
 
         let mut connections = Vec::new();
@@ -93,35 +95,23 @@ impl Controller {
         }
 
         model.update_connections(connections);
-
-
-        // println!("{:?}", self.get_all_ports());
     }
 
-    // fn split_midi_ports(ports: Vec<String>) -> (Vec<String>, Vec<String>) {
-    //     for name in ports.iter() {
-    //         port = self.interface.port_by_name(name);
-    //     }
-    // }
-
-    // fn get_all_ports(&self) -> Vec<jack::Port<jack::Unowned>> {
-    //     let mut i = 1;
-    //     let mut cont = true;
-    //     let mut ports: Vec<jack::Port<jack::Unowned>> = Vec::new();
-    //     while cont {
-    //         match self.interface.port_by_id(i){
-    //             Some(port) =>  {
-    //                 println!("{:?}",port);
-    //                 if &port.name().unwrap_or("".to_owned())  == "" {
-    //                     cont = false;
-    //                 } else {
-    //                     ports.push(port);
-    //                     i += 1;
-    //                 }
-    //             },
-    //             None => cont = false,
-    //         }
-    //     }
-    //     ports
-    // }
+    fn split_midi_ports(&self, ports: Vec<String>) -> (Vec<String>, Vec<String>) {
+        let mut audio_ports:Vec<String> = Vec::new();
+        let mut midi_ports:Vec<String> = Vec::new();
+        for name in ports.iter() {
+            let port = self.interface.port_by_name(name).unwrap();
+            match port.port_type() {
+                Ok(t) => match t.as_str() {
+                    "32 bit float mono audio" => audio_ports.push(name.to_owned()),
+                    "8 bit raw midi" => midi_ports.push(name.to_owned()),
+                    e => println!("Unknown port format \"{}\" for port {}", e, name),
+                
+                },
+                Err(e) => println!("Could not open port {}: {}", name, e.to_string()),
+            }   
+        }
+        (audio_ports, midi_ports)
+    }
 }
