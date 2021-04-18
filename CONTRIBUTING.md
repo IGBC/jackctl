@@ -1,5 +1,4 @@
 # Contributing
-
 Please note when contributing to this project you are bound by our code of conduct, and the Contributor's Agreement at the bottom of this document.
 
 Please refer to code_of_conduct.md for details.
