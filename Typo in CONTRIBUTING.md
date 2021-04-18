@@ -44,8 +44,8 @@ Any individual submitting any program code, assets, or other content including, 
 
 2. The Contributor agrees to provide permission to the project owners to freely, and without restriction use and redistribute the contributed material for any purpose pertaining to the project. However the contributed material will remain the intellectual property of the Contributor.
 
-3. The Contributor gives consent for the project owners to change the license under which the project is distributed at any time, provided the new license does not impede access free to the project for non commercial use. Under this article the Contributor agrees that their contributions are therefore free of any specific license agreement, including the license of the project at the time of the contribution.
+3. The Contributor gives consent for the project owners to change the license under which the project is distributed at any time, provided the new license does not impede free access to the project for non commercial use. Under this article the Contributor agrees that their contributions are therefore free of any specific license agreement, including the license of the project at the time of the contribution.
 
-4. All assets, artworks, or other media contributed to the project must be fulled owned or authored by the Contributor. By providing these materials the Contributor agrees to license the works to the project under the CC-Zero license, which can be found at https://creativecommons.org/share-your-work/public-domain/cc0/
+4. All assets, artworks, or other media contributed to the project must be fulled owned by the Contributor. By providing these materials the Contributor agrees to license the works to the project under the CC-Zero license, which can be found at https://creativecommons.org/share-your-work/public-domain/cc0/
 
 The project owners retain the right to update this agreement, the code of conduct, and contribution guidelines at any time.
