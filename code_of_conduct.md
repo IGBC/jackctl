@@ -27,6 +27,9 @@ community include:
 
 Examples of unacceptable behavior include:
 
+* The use of hateful or derogatory language or imagery toward any individual or
+  group including but not limited to abuse of the following kinds: (Racism, 
+  Sexism, Agism, Ableism, Homophobia, Transphobia, Abuse of other LGBT+ groups, or Exessive Nationalism)
 * The use of sexualized language or imagery, and sexual attention or
   advances of any kind
 * Trolling, insulting or derogatory comments, and personal or political attacks
@@ -100,12 +103,8 @@ permanent ban.
 sustained inappropriate behavior, harassment of an individual, or aggression 
 toward or disparagement of classes of individuals..
 
-**Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
-
+**Consequence**: A permanent ban from any sort of public interaction within
+the community.
 
 ## Attribution
 

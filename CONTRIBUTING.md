@@ -1,6 +1,10 @@
 # Contributing
+<<<<<<< HEAD
 
 Please note when contributing to this project you are bound by our code of conduct. 
+=======
+Please note when contributing to this project you are bound by our code of conduct, and the Contributor's Agreement at the bottom of this document.
+>>>>>>> 1cc1e15c0adefbb30b0b52554effabf399f1f0ef
 
 Please refer to code_of_conduct.md for details.
 
@@ -38,7 +42,7 @@ When submitting a Pull Request please follow the following steps to avoid disapo
 After Submitting your PR it will be reviewed by the project owners, the review process can take a while, as we all do this in our spare time, so please be patient. Amendments may be requested, but if the PR is suitable for addition to the project it will be merged after a brief discussion.
 
 ## Contributor's Agreement
-Contributors to this project must only submit work that is wholely owned by themselves. We don't want to get sued for you reusing someone elses code. We request that any assets or artwork contributed to the project be licenced to the project under CC-Zero, this keeps things simple. If this can't be done please raise this in the PR and we will discuss how to work around it.
+Contributors to this project must only submit work that is wholely owned by themselves. We don't want to get sued for you reusing someone else's code. We request that any assets or artwork contributed to the project be licenced to the project under CC-Zero, this keeps things simple. If this can't be done please raise this in the PR and we will discuss how to work around it.
 
 There was a full CLA here. Any code contributed under that CLA is released from its terms. CLA's are evil. This project will be FOSS forever.
 
