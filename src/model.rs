@@ -3,17 +3,18 @@ use std::rc::Rc;
 
 pub type Model = Rc<RefCell<ModelInner>>;
 
-#[derive(Default)]
 pub struct PortGroup {
+    is_midi: bool,
     groups: Vec<Group>,
 }
 
-#[derive(Default)]
+#[derive(Clone)]
 pub struct Group {
     name: String,
     ports: Vec<Port>,
 }
 
+#[derive(Clone)]
 pub struct Port {
     portname: String,
     id: usize,
@@ -25,7 +26,6 @@ pub struct Connection {
     pub output: String,
 }
 
-#[derive(Default)]
 pub struct ModelInner {
     ixruns: u32,
     pub layout_dirty: bool,
@@ -35,14 +35,29 @@ pub struct ModelInner {
     pub buffer_size: u32,
     pub latency:     u64,
 
-    inputs: PortGroup,
-    outputs: PortGroup,
+    audio_inputs: PortGroup,
+    audio_outputs: PortGroup,
+    midi_inputs: PortGroup,
+    midi_outputs: PortGroup,
     connections: Vec<Connection>,
 }
 
 impl ModelInner {
     pub fn new() -> Model {
-        Rc::new(RefCell::new(ModelInner::default()))
+        Rc::new(RefCell::new(ModelInner{
+            ixruns: 0,
+            layout_dirty: true,
+            cpu_percent: 0.0,
+            sample_rate: 0,
+            buffer_size: 0,
+            latency: 0,
+
+            audio_inputs: PortGroup::new(false),
+            audio_outputs: PortGroup::new(false),
+            midi_inputs: PortGroup::new(true),
+            midi_outputs: PortGroup::new(true),
+            connections: Vec::new(),
+        }))
     }
 
     pub fn increment_xruns(&mut self) {
@@ -58,8 +73,8 @@ impl ModelInner {
         self.ixruns = 0;
     }
 
-    fn map_groups(ports: &Vec<String>) -> PortGroup {
-        let mut map: PortGroup = PortGroup::default();
+    fn map_groups(ports: &Vec<String>, is_midi: bool) -> PortGroup {
+        let mut map: PortGroup = PortGroup::new(is_midi);
 
         for p in ports.iter() {
             map.add(p);
@@ -68,22 +83,48 @@ impl ModelInner {
         map
     }
 
-    pub fn update_inputs(&mut self, ports: &Vec<String>) {
-        self.inputs = Self::map_groups(ports);
+    pub fn update_audio_inputs(&mut self, ports: &Vec<String>) {
+        self.audio_inputs = Self::map_groups(ports, false);
         self.layout_dirty = true;
     }
 
-    pub fn inputs(&self) -> &PortGroup {
-        &self.inputs
+    pub fn audio_inputs(&self) -> &PortGroup {
+        &self.audio_inputs
     }
 
-    pub fn update_outputs(&mut self, ports: &Vec<String>) {
-        self.outputs = Self::map_groups(ports);
+    pub fn update_audio_outputs(&mut self, ports: &Vec<String>) {
+        self.audio_outputs = Self::map_groups(ports, false);
         self.layout_dirty = true;
     }
 
-    pub fn outputs(&self) -> &PortGroup {
-        &self.outputs
+    pub fn audio_outputs(&self) -> &PortGroup {
+        &self.audio_outputs
+    }
+
+    pub fn update_midi_inputs(&mut self, ports: &Vec<String>) {
+        self.midi_inputs = Self::map_groups(ports, true);
+        self.layout_dirty = true;
+    }
+
+    pub fn midi_inputs(&self) -> &PortGroup {
+        &self.midi_inputs
+    }
+
+    pub fn update_midi_outputs(&mut self, ports: &Vec<String>) {
+        self.midi_outputs = Self::map_groups(ports, true);
+        self.layout_dirty = true;
+    }
+
+    pub fn midi_outputs(&self) -> &PortGroup {
+        &self.midi_outputs
+    }
+
+    pub fn inputs(&self) -> PortGroup {
+        self.audio_inputs.merge(&self.midi_inputs)
+    }
+
+    pub fn outputs(&self) -> PortGroup {
+        self.audio_outputs.merge(&self.midi_outputs)
     }
 
     pub fn update_connections(&mut self, connections: Vec<Connection>) {
@@ -91,8 +132,8 @@ impl ModelInner {
     }
 
     pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
-        let output_name = self.outputs.get_port_name_by_id(id1);
-        let input_name = self.inputs.get_port_name_by_id(id2);
+        let output_name = self.outputs().get_port_name_by_id(id1);
+        let input_name = self.inputs().get_port_name_by_id(id2);
         if output_name.is_none() || input_name.is_none() {
             return false;
         }
@@ -136,14 +177,41 @@ impl Port {
 
 
 impl PortGroup {
+    pub fn new(is_midi: bool) -> Self {
+        PortGroup {
+            is_midi,
+            groups: Vec::new(),
+        }
+    }
+
+    pub fn merge(&self, rhs: &Self) -> Self {
+        let mut pg = Self::new(false);
+        for i in self.iter() {
+            pg.add_group(i.clone());
+        }
+
+        for i in rhs.iter() {
+            pg.add_group(i.clone());
+        }
+
+        pg
+    }
+
     pub fn add(&mut self, name: &str) {
         let mut parts: Vec<&str> = name.split(':').collect();
         let group: String = parts.remove(0).to_owned();
         let portname = parts.join(":");
 
-        let port = Port {
-            portname,
-            id: self.len(),
+        let port = if self.is_midi {
+            Port {
+                portname,
+                id: self.len() + 1000,
+            }
+        } else {
+            Port {
+                portname,
+                id: self.len(),
+            }
         };
 
         let g: &mut Group = match self.groups.iter().position( |r| r.name() == &group) {
@@ -155,6 +223,10 @@ impl PortGroup {
         };
 
         g.add(port);
+    }
+
+    fn add_group(&mut self, group: Group) {
+        self.groups.push(group);
     }
 
     pub fn no_groups(&self) -> usize {

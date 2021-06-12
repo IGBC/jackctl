@@ -9,7 +9,7 @@ use gtk::Builder;
 use gtk::Application;
 use glib::signal::SignalHandlerId;
 
-use crate::model::{Model, ModelInner, Port};
+use crate::model::{Model, Port, PortGroup};
 use crate::engine::Controller;
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
@@ -29,7 +29,8 @@ pub struct MainDialog {
     performance_latency: Label,
     tabs: Notebook,
     
-    matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
+    audio_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
+    midi_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
 }
 
 fn get_object<T>(builder: &Builder, name: &str) -> T 
@@ -132,7 +133,8 @@ impl MainDialog {
             performance_frames,
             performance_latency,
             tabs,
-            matrix: Vec::new(),
+            audio_matrix: Vec::new(),
+            midi_matrix: Vec::new(),
         }));
 
         // hookup the update function
@@ -145,6 +147,85 @@ impl MainDialog {
     pub fn show(&self) {
         self.window.show_all();
         self.window.present();
+    }
+
+    fn update_matrix(&self, inputs: &PortGroup, outputs: &PortGroup) -> (Grid, Vec<Vec<(CheckButton, SignalHandlerId)>>) {
+        let grid = grid();
+        
+        if inputs.is_empty() || outputs.is_empty() {
+        
+            let l = grid_label("No ports are currently available.", false);
+            l.set_halign(Align::Center);
+            grid.attach(&l,0,0,1,1);
+
+            (grid,Vec::new())
+
+        } else {
+            
+            let i_groups = inputs.no_groups();
+            let o_groups = outputs.no_groups();
+            let n_audio_inputs = inputs.len();
+            let n_audio_outputs = outputs.len();
+            let max_x: i32 = 2 + i_groups as i32 + n_audio_inputs as i32 - 1;
+            let max_y: i32 = 2 + o_groups as i32 + n_audio_outputs as i32 - 1;
+
+            let mut curr_x = 2;
+            for (i, g) in inputs.iter().enumerate() {
+                grid.attach(&grid_label(g.name(), true), curr_x, 0, g.len() as i32, 1);
+                
+                for n in g.iter() {
+                    grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
+                    curr_x += 1;
+                }
+
+                if i < i_groups -1 {
+                    grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
+                    curr_x += 1;
+                }
+            }
+
+            let mut curr_y = 2;
+            for (i, g) in outputs.iter().enumerate() {
+                grid.attach(&grid_label(g.name(), false), 0, curr_y, 1, g.len() as i32);
+                
+                for n in g.iter() {
+                    grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
+                    curr_y += 1;
+                }
+
+                if i < o_groups -1 {
+                    grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_y, max_x, 1);
+                    curr_y += 1;
+                }
+            }
+
+            let mut curr_x = 2;
+            let mut x_vec = Vec::new();
+            for g2 in inputs.iter() {
+                for n2 in g2.iter() {
+                    let mut curr_y = 2;
+                    let mut y_vec = Vec::new();
+                    for g1 in outputs.iter() {
+                        for n1 in g1.iter() {
+                            
+                            let (cb, handler) = self.grid_checkbox(n1, n2);
+                            grid.attach(&cb, curr_x, curr_y, 1, 1);
+                            
+                            y_vec.push((cb, handler));
+                            curr_y += 1;
+                        }
+                        // skip over the separator;
+                        curr_y += 1;
+                    }
+                    x_vec.push(y_vec);
+                    curr_x += 1;
+                }
+                // skip over the separator
+                curr_x += 1;
+            }       
+            
+            (grid, x_vec)    
+        }
     }
 
     pub fn update_ui(&mut self) -> gtk::Inhibit {
@@ -162,80 +243,17 @@ impl MainDialog {
             model.layout_dirty = false;
             let page = self.tabs.get_current_page();
 
-            if model.inputs().is_empty() || model.outputs().is_empty() {
-                let l = grid_label("No Jack audio ports are currently available.", false);
-                l.set_halign(Align::Center);
-                self.tabs.remove_page(Some(0));
-                self.tabs.insert_page(&l, Some(&Label::new(Some("Matrix"))), Some(0));
-            } else {
-                let grid = grid();
-                let i_groups = model.inputs().no_groups();
-                let o_groups = model.outputs().no_groups();
-                let n_inputs = model.inputs().len();
-                let n_outputs = model.outputs().len();
-                let max_x: i32 = 2 + i_groups as i32 + n_inputs as i32 - 1;
-                let max_y: i32 = 2 + o_groups as i32 + n_outputs as i32 - 1;
+            // update Audio Matrix Tab
+            let (audio_matrix, cb_vec) = self.update_matrix(model.audio_inputs(), model.audio_outputs());
+            self.tabs.remove_page(Some(0));
+            self.tabs.insert_page(&audio_matrix, Some(&Label::new(Some("Matrix"))), Some(0));
+            self.audio_matrix = cb_vec;
 
-                let mut curr_x = 2;
-                for (i, g) in model.inputs().iter().enumerate() {
-                    grid.attach(&grid_label(g.name(), true), curr_x, 0, g.len() as i32, 1);
-                    
-                    for n in g.iter() {
-                        grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
-                        curr_x += 1;
-                    }
-
-                    if i < i_groups -1 {
-                        grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
-                        curr_x += 1;
-                    }
-                }
-    
-                let mut curr_y = 2;
-                for (i, g) in model.outputs().iter().enumerate() {
-                    grid.attach(&grid_label(g.name(), false), 0, curr_y, 1, g.len() as i32);
-                    
-                    for n in g.iter() {
-                        grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
-                        curr_y += 1;
-                    }
-
-                    if i < o_groups -1 {
-                        grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_y, max_x, 1);
-                        curr_y += 1;
-                    }
-                }
-
-                let mut curr_x = 2;
-                let mut x_vec = Vec::new();
-                for g2 in model.inputs().iter() {
-                    for n2 in g2.iter() {
-                        let mut curr_y = 2;
-                        let mut y_vec = Vec::new();
-                        for g1 in model.outputs().iter() {
-                            for n1 in g1.iter() {
-                                
-                                let (cb, handler) = self.grid_checkbox(n1, n2, &model);
-                                grid.attach(&cb, curr_x, curr_y, 1, 1);
-                                
-                                y_vec.push((cb, handler));
-                                curr_y += 1;
-                            }
-                            // skip over the separator;
-                            curr_y += 1;
-                        }
-                        x_vec.push(y_vec);
-                        curr_x += 1;
-                    }
-                    // skip over the separator
-                    curr_x += 1;
-                }       
-                
-                self.matrix = x_vec;
-    
-                self.tabs.remove_page(Some(0));
-                self.tabs.insert_page(&grid, Some(&Label::new(Some("Matrix"))), Some(0));    
-            }
+            // update Midi Matrix Tab
+            let (midi_matrix, cb_vec) = self.update_matrix(model.midi_inputs(), model.midi_outputs());
+            self.tabs.remove_page(Some(1));
+            self.tabs.insert_page(&midi_matrix, Some(&Label::new(Some("MIDI"))), Some(1));
+            self.midi_matrix = cb_vec;
 
             self.tabs.show_all();
             
@@ -243,7 +261,7 @@ impl MainDialog {
 
         }
 
-        for (i, col) in self.matrix.iter().enumerate() {
+        for (i, col) in self.audio_matrix.iter().enumerate() {
             for (j, (item, handle)) in col.iter().enumerate() {
                 item.block_signal(handle);
                 item.set_active(model.connected_by_id(j, i));
@@ -251,12 +269,20 @@ impl MainDialog {
             }
         } 
 
+        for (i, col) in self.midi_matrix.iter().enumerate() {
+            for (j, (item, handle)) in col.iter().enumerate() {
+                item.block_signal(handle);
+                item.set_active(model.connected_by_id(j+1000, i+1000));
+                item.unblock_signal(handle); 
+            }
+        }
+
         gtk::Inhibit(false)
     }
 
-    fn grid_checkbox(&self, port1: &Port, port2: &Port, model: &ModelInner) -> (CheckButton, SignalHandlerId) {
+    fn grid_checkbox(&self, port1: &Port, port2: &Port, /*model: &ModelInner*/) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
-        button.set_active(model.connected_by_id(port1.id(), port2.id()));
+        //button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
         button.set_margin_start(5);
         button.set_margin_bottom(5);

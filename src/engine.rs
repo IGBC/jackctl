@@ -13,6 +13,8 @@ pub struct Controller {
     interface: JackClient,
     old_audio_inputs: Vec<String>,
     old_audio_outputs: Vec<String>,
+    old_midi_inputs: Vec<String>,
+    old_midi_outputs: Vec<String>,
 }
 
 impl Controller {
@@ -21,6 +23,8 @@ impl Controller {
             model: model,
             old_audio_inputs: Vec::new(),
             old_audio_outputs: Vec::new(),
+            old_midi_inputs: Vec::new(),
+            old_midi_outputs: Vec::new(),
             interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER).unwrap().0,
         }));
         this.borrow_mut().update_ui();
@@ -65,16 +69,31 @@ impl Controller {
 
         let inputs = self.interface.ports(None, None, PortFlags::IS_INPUT);
         let (ap, mp) = self.split_midi_ports(inputs.clone());
+        //Check audio ports changed
         if ap != self.old_audio_inputs {
-            model.update_inputs(&ap);
+            model.update_audio_inputs(&ap);
             self.old_audio_inputs = ap;
+        }
+        
+        // check midi ports changed 
+        if mp != self.old_midi_inputs {
+            model.update_midi_inputs(&mp);
+            self.old_midi_inputs = mp;
         }
         
         let outputs = self.interface.ports(None, None, PortFlags::IS_OUTPUT);
         let (ap, mp) = self.split_midi_ports(outputs.clone());
+        
+        // Check audio ports changed
         if ap != self.old_audio_outputs {
-            model.update_outputs(&ap);
+            model.update_audio_outputs(&ap);
             self.old_audio_outputs = ap;
+        }
+
+        // Check midi ports changed
+        if mp != self.old_midi_outputs {
+            model.update_midi_outputs(&mp);
+            self.old_midi_outputs = mp;
         }
 
         let mut connections = Vec::new();
