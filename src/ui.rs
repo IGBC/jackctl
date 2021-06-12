@@ -1,5 +1,7 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::env;
+use std::path::Path;
 
 use gtk::prelude::*;
 use gtk::{Window, Label, Image, Button, LevelBar, Notebook, Grid, CheckButton, Align, Separator, Orientation};
@@ -9,6 +11,8 @@ use glib::signal::SignalHandlerId;
 
 use crate::model::{Model, ModelInner, Port};
 use crate::engine::Controller;
+
+use libappindicator::{AppIndicator, AppIndicatorStatus};
 
 pub struct MainDialog {
     state: Model,
@@ -36,7 +40,7 @@ where T: gtk::prelude::IsA<glib::object::Object> {
 
 pub fn init_ui(state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<MainDialog>> {
     // define the gtk application with a unique name and default parameters
-    let _application = Application::new(Some("The.name.goes.here"), Default::default())
+    let _application = Application::new(Some("jackctl.segfault"), Default::default())
     .expect("Initialization failed");
 
     // this registers a closure (executing our setup_gui function) 
@@ -48,7 +52,30 @@ pub fn init_ui(state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<
     // this builder provides access to all components of the defined ui
     let builder = Builder::from_string(glade_src);
     
-    MainDialog::new(builder, state, controller)
+    let this = MainDialog::new(builder, state, controller);
+    
+    let win_clone = this.clone();
+
+    let mut indicator = AppIndicator::new("jackctl", "");
+    indicator.set_status(AppIndicatorStatus::Active);
+    let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    indicator.set_icon_theme_path(icon_path.to_str().unwrap());
+    indicator.set_icon_full("rust-logo-64x64-blk", "icon");
+    let mut m = gtk::Menu::new();
+    let mi = gtk::CheckMenuItem::with_label("exit");
+    mi.connect_activate(|_| {
+        gtk::main_quit();
+    });
+    m.append(&mi);
+    let mi = gtk::CheckMenuItem::with_label("show");
+    mi.connect_activate(move |_| {
+        win_clone.borrow().show();
+    });
+    m.append(&mi);
+    indicator.set_menu(&mut m);
+    m.show_all();
+
+    this
 }
 
 impl MainDialog {
@@ -117,6 +144,7 @@ impl MainDialog {
 
     pub fn show(&self) {
         self.window.show_all();
+        self.window.present();
     }
 
     pub fn update_ui(&mut self) -> gtk::Inhibit {

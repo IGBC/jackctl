@@ -12,3 +12,4 @@ gio = {version = "0.9", features = ["v2_56"] }
 glib = "*"
 
 jack = "0.7"
+libappindicator = "0.5"
