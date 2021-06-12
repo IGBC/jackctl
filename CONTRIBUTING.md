@@ -1,6 +1,10 @@
 # Contributing
+<<<<<<< HEAD
 
+Please note when contributing to this project you are bound by our code of conduct. 
+=======
 Please note when contributing to this project you are bound by our code of conduct, and the Contributor's Agreement at the bottom of this document.
+>>>>>>> 1cc1e15c0adefbb30b0b52554effabf399f1f0ef
 
 Please refer to code_of_conduct.md for details.
 
@@ -37,15 +41,9 @@ When submitting a Pull Request please follow the following steps to avoid disapo
 
 After Submitting your PR it will be reviewed by the project owners, the review process can take a while, as we all do this in our spare time, so please be patient. Amendments may be requested, but if the PR is suitable for addition to the project it will be merged after a brief discussion.
 
-## Contributors Agreement
-Any individual submitting any program code, assets, or other content including, but not limited to: Pull Requests, Issues, Comments, Wiki Pages, or Commits (hereafter referred to as the Contributor), agrees to all articles of the following agreement:
+## Contributor's Agreement
+Contributors to this project must only submit work that is wholely owned by themselves. We don't want to get sued for you reusing someone else's code. We request that any assets or artwork contributed to the project be licenced to the project under CC-Zero, this keeps things simple. If this can't be done please raise this in the PR and we will discuss how to work around it.
 
-1. The Contributor agrees to abide by all terms described in the projects Code of Conduct. Failure to comply may result in access to the project being revoked.
-
-2. The Contributor agrees to provide permission to the project owners to freely, and without restriction use and redistribute the contributed material for any purpose pertaining to the project. However the contributed material will remain the intellectual property of the Contributor.
-
-3. The Contributor gives consent for the project owners to change the license under which the project is distributed at any time, provided the new license does not impede free access to the project for non commercial use. Under this article the Contributor agrees that their contributions are therefore free of any specific license agreement, including the license of the project at the time of the contribution.
-
-4. All assets, artworks, or other media contributed to the project must be fulled owned by the Contributor. By providing these materials the Contributor agrees to license the works to the project under the CC-Zero license, which can be found at https://creativecommons.org/share-your-work/public-domain/cc0/
+There was a full CLA here. Any code contributed under that CLA is released from its terms. CLA's are evil. This project will be FOSS forever.
 
 The project owners retain the right to update this agreement, the code of conduct, and contribution guidelines at any time.

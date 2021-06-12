@@ -24,6 +24,6 @@ Contributions are welcome. See CONTRIBUTING.md for contribution guidelines befor
 
 ## License
 
-This project is licensed under the GNU General Public License Version 3.0
+This project is licensed under the GNU General Public License Version 3.0 or later.:
 
 See LICENSE.txt for the full license terms.
