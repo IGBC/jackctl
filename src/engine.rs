@@ -65,7 +65,7 @@ impl Controller {
         model.sample_rate = self.interface.sample_rate();
         let frames = self.interface.buffer_size();
         model.buffer_size = frames.into();
-        model.latency = self.interface.frames_to_time(1) / 1000;
+        model.latency = (model.buffer_size) as u64 / (model.sample_rate as u64 / 1000u64) as u64;
 
         let inputs = self.interface.ports(None, None, PortFlags::IS_INPUT);
         let (ap, mp) = self.split_midi_ports(inputs.clone());
