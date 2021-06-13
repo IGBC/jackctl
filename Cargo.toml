@@ -10,6 +10,7 @@ edition = "2018"
 gtk = { version = "0.9", features = ["v3_24"] }
 gio = {version = "0.9", features = ["v2_56"] }
 glib = "*"
+libappindicator = "0.5"
 
 jack = "0.7"
-libappindicator = "0.5"
+alsa = "0.5"

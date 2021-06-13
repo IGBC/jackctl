@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::mixer::MixerModel;
+
 pub type Model = Rc<RefCell<ModelInner>>;
 
 pub struct PortGroup {
@@ -40,10 +42,15 @@ pub struct ModelInner {
     midi_inputs: PortGroup,
     midi_outputs: PortGroup,
     connections: Vec<Connection>,
+
+    mixer: MixerModel,
 }
 
 impl ModelInner {
     pub fn new() -> Model {
+        let mixer = MixerModel::new();
+        println!("MixerModel: {:?}", mixer);
+
         Rc::new(RefCell::new(ModelInner{
             ixruns: 0,
             layout_dirty: true,
@@ -57,6 +64,8 @@ impl ModelInner {
             midi_inputs: PortGroup::new(true),
             midi_outputs: PortGroup::new(true),
             connections: Vec::new(),
+
+            mixer,
         }))
     }
 
