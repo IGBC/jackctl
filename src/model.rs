@@ -49,8 +49,6 @@ pub struct ModelInner {
 impl ModelInner {
     pub fn new() -> Model {
         let mixer = MixerModel::new();
-        println!("MixerModel: {:?}", mixer);
-
         Rc::new(RefCell::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
@@ -71,7 +69,6 @@ impl ModelInner {
 
     pub fn increment_xruns(&mut self) {
         self.ixruns += 1;
-        println!("Xruns: {}", self.ixruns);
     }
 
     pub fn xruns(&self) -> u32 {

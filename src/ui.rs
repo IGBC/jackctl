@@ -123,6 +123,7 @@ impl MainDialog {
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
         let xruns_icon: Image = get_object(&builder, "icon.xruns.maindialog");
         xruns_icon.set_from_icon_name(Some("dialog-warning-symbolic"), gtk::IconSize::Button);
+        //xruns_icon.connect_clicked(move |icon| { state.borrow().reset_xruns(); icon.hide();})
 
         // Setup CPU Meter
         let cpu_label: Label = get_object(&builder, "label.cpu.maindialog");
@@ -317,6 +318,11 @@ impl MainDialog {
         let mut model = self.state.borrow_mut();
         self.xruns_label
             .set_markup(&format!("{} XRuns", model.xruns()));
+        if model.xruns() == 0 {
+            self.xruns_icon.hide();
+        } else {
+            self.xruns_icon.show_all();
+        }
 
         self.cpu_label
             .set_markup(&format!("{}%", model.cpu_percent.trunc()));
@@ -468,6 +474,7 @@ impl MainDialog {
             .inverted(true)
             .hexpand(true)
             .height_request(200)
+            .digits(0)
             .build();
         s.set_value_pos(PositionType::Bottom);
         (s, a, signal)
