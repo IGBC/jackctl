@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 
 use alsa::card::Iter as CardIter;
-use alsa::mixer::{Mixer, Selem, SelemId};
+use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
 
 use std::cell::RefCell;
 use std::fmt;
@@ -15,9 +15,11 @@ pub struct MixerController {
 }
 
 pub struct MixerChannel {
-    id: SelemId,
-    has_switch: bool,
-    has_volume: bool,
+    pub id: SelemId,
+    pub is_playback: bool,
+    pub has_switch: bool,
+    pub volume_min: i64,
+    pub volume_max: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -68,11 +70,27 @@ impl MixerModel {
 
             for channel in mixer.iter() {
                 let s = Selem::new(channel).unwrap();
-                channels.push(MixerChannel {
-                    id: s.get_id(),
-                    has_switch: s.has_playback_switch() || s.has_capture_switch(),
-                    has_volume: s.has_volume(),
-                })
+                if s.has_capture_volume() {
+                    let (volume_min, volume_max) = s.get_capture_volume_range();
+                    channels.push(MixerChannel {
+                        id: s.get_id(),
+                        is_playback: false,
+                        has_switch: s.has_capture_switch(),
+                        volume_max,
+                        volume_min,
+                    });
+                } else {
+                    if s.has_playback_volume() {
+                        let (volume_min, volume_max) = s.get_playback_volume_range();
+                        channels.push(MixerChannel {
+                            id: s.get_id(),
+                            is_playback: true,
+                            has_switch: s.has_playback_switch(),
+                            volume_max,
+                            volume_min,
+                        });
+                    }
+                };
             }
 
             cards.push(Card {
@@ -97,6 +115,40 @@ impl Card {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn len(&self) -> usize {
+        self.channels.len()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, MixerChannel> {
+        self.channels.iter()
+    }
+
+    pub fn get_volume(&mut self, channel: MixerChannel) -> i64 {
+        let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
+        let element = mixer.find_selem(&channel.id).unwrap();
+        if channel.is_playback {
+            element
+                .get_playback_volume(SelemChannelId::FrontLeft)
+                .unwrap()
+        } else {
+            element
+                .get_capture_volume(SelemChannelId::FrontLeft)
+                .unwrap()
+        }
+    }
+
+    pub fn set_volume(&mut self, channel: MixerChannel, volume: i64) {
+        let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
+        let element = mixer.find_selem(&channel.id).unwrap();
+        if channel.is_playback {
+            element.set_playback_volume_all(volume).unwrap()
+        } else {
+            element
+                .set_capture_volume(SelemChannelId::FrontLeft, volume)
+                .unwrap()
+        }
+    }
 }
 
 impl fmt::Debug for MixerChannel {
@@ -104,7 +156,9 @@ impl fmt::Debug for MixerChannel {
         f.debug_struct("MixerChannel")
             .field("id", &(self.id.get_index(), self.id.get_name()))
             .field("has_switch", &self.has_switch)
-            .field("has_volume", &self.has_volume)
+            .field("volume_max", &self.volume_max)
+            .field("volue_min", &self.volume_min)
+            .field("is_playback", &self.is_playback)
             .finish()
     }
 }
@@ -119,8 +173,10 @@ impl std::clone::Clone for MixerChannel {
     fn clone(&self) -> Self {
         Self {
             has_switch: self.has_switch,
-            has_volume: self.has_volume,
             id: SelemId::new(self.id.get_name().unwrap(), self.id.get_index()),
+            volume_max: self.volume_max,
+            volume_min: self.volume_min,
+            is_playback: self.is_playback,
         }
     }
 }

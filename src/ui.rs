@@ -8,9 +8,11 @@ use gtk::prelude::*;
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
-    Align, Button, CheckButton, Grid, Image, Label, LevelBar, Notebook, Orientation, Separator,
-    Window,
+    Adjustment, Align, Button, CheckButton, Grid, Image, Label, LevelBar, Notebook, Orientation,
+    PositionType, Scale, ScaleBuilder, Separator, Window,
 };
+
+use crate::mixer::{MixerController, MixerChannel, MixerModel};
 
 use crate::jack::JackController;
 use crate::model::{Model, Port, PortGroup};
@@ -19,7 +21,7 @@ use libappindicator::{AppIndicator, AppIndicatorStatus};
 
 pub struct MainDialog {
     state: Model,
-    controller: Rc<RefCell<JackController>>,
+    jack_controller: Rc<RefCell<JackController>>,
 
     //builder: Builder,
     window: Window,
@@ -46,7 +48,7 @@ where
     o
 }
 
-pub fn init_ui(state: Model, controller: Rc<RefCell<JackController>>) -> Rc<RefCell<MainDialog>> {
+pub fn init_ui(state: Model, jack_controller: Rc<RefCell<JackController>>, alsa_controller: Rc<RefCell<MixerController>>) -> Rc<RefCell<MainDialog>> {
     // define the gtk application with a unique name and default parameters
     let _application = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Initialization failed");
@@ -60,7 +62,7 @@ pub fn init_ui(state: Model, controller: Rc<RefCell<JackController>>) -> Rc<RefC
     // this builder provides access to all components of the defined ui
     let builder = Builder::from_string(glade_src);
 
-    let this = MainDialog::new(builder, state, controller);
+    let this = MainDialog::new(builder, state, jack_controller, alsa_controller);
 
     let win_clone = this.clone();
 
@@ -90,7 +92,8 @@ impl MainDialog {
     pub fn new(
         builder: Builder,
         state: Model,
-        controller: Rc<RefCell<JackController>>,
+        jack_controller: Rc<RefCell<JackController>>,
+        alsa_controller: Rc<RefCell<MixerController>>,
     ) -> Rc<RefCell<Self>> {
         // Initialise the state:
 
@@ -132,7 +135,7 @@ impl MainDialog {
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,
-            controller,
+            jack_controller,
             //builder,
             window: window.clone(),
             xruns_label,
@@ -244,6 +247,50 @@ impl MainDialog {
         }
     }
 
+    pub fn update_mixer(&self, cards: &MixerModel) -> Grid {
+        let grid = grid();
+        grid.set_hexpand(true);
+        grid.set_vexpand(true);
+        let mut x_pos = 0;
+        for card in cards.iter() {
+            let len = card.len();
+            if len == 0 {
+                grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
+                grid.attach(
+                    &mixer_label("Device Has No Controls", true),
+                    x_pos as i32,
+                    0,
+                    1,
+                    2,
+                );
+                x_pos += 1;
+            } else {
+                grid.attach(&mixer_label(card.name(), false), x_pos, 3, len as i32, 1);
+                for channel in card.iter() {
+                    grid.attach(
+                        &mixer_label(channel.id.get_name().unwrap(), true),
+                        x_pos,
+                        0,
+                        1,
+                        1,
+                    );
+
+                    grid.attach(&self.mixer_fader(channel), x_pos, 1, 1, 1);
+
+                    if channel.has_switch {
+                        let (cb, _) = self.mixer_checkbox();
+                        grid.attach(&cb, x_pos, 2, 1, 1);
+                    }
+                    x_pos += 1;
+                }
+            }
+            grid.attach(&Separator::new(Orientation::Vertical), x_pos, 0, 1, 4);
+            x_pos += 1;
+        }
+
+        grid
+    }
+
     pub fn update_ui(&mut self) -> gtk::Inhibit {
         let mut model = self.state.borrow_mut();
         self.xruns_label
@@ -280,15 +327,11 @@ impl MainDialog {
                 .insert_page(&midi_matrix, Some(&Label::new(Some("MIDI"))), Some(1));
             self.midi_matrix = cb_vec;
 
-            // TODO: update Mixer Tab
+            // update Mixer Tab
+            let mixer_matrix = self.update_mixer(model.cards());
             self.tabs.remove_page(Some(2));
-
-            let grid = grid();
-            for (i, card) in model.cards().iter().enumerate() {
-                grid.attach(&grid_label(card.name(), false), 0, i as i32, 1, 1);
-            }
             self.tabs
-                .insert_page(&grid, Some(&Label::new(Some("Mixer"))), Some(2));
+                .insert_page(&mixer_matrix, Some(&Label::new(Some("Mixer"))), Some(2));
 
             self.tabs.show_all();
 
@@ -317,21 +360,55 @@ impl MainDialog {
     fn grid_checkbox(
         &self,
         port1: &Port,
-        port2: &Port, /*model: &ModelInner*/
+        port2: &Port,
     ) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
-        //button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
         button.set_margin_start(5);
         button.set_margin_bottom(5);
         button.set_margin_end(5);
-        let clone = self.controller.clone();
+        let clone = self.jack_controller.clone();
         let id1 = port1.id();
         let id2 = port2.id();
         let signal_id = button.connect_clicked(move |cb| {
             clone.borrow().connect_ports(id1, id2, cb.get_active());
         });
         (button, signal_id)
+    }
+
+    fn mixer_checkbox(&self) -> (CheckButton, SignalHandlerId) {
+        let button = CheckButton::new();
+        //button.set_active(model.connected_by_id(port1.id(), port2.id()));
+        button.set_margin_top(5);
+        button.set_margin_start(5);
+        button.set_margin_bottom(5);
+        button.set_margin_end(5);
+
+        let signal_id = button.connect_clicked(move |cb| {
+            
+        });
+        (button, signal_id)
+    }
+
+    fn mixer_fader(&self, chan: &MixerChannel) -> Scale {
+        let a = Adjustment::new(
+            0.0,
+            chan.volume_min as f64,
+            chan.volume_max as f64,
+            1.0,
+            10.0,
+            0.0,
+        );
+        let s = ScaleBuilder::new()
+            .adjustment(&a)
+            .orientation(Orientation::Vertical)
+            .value_pos(PositionType::Bottom)
+            .inverted(true)
+            .hexpand(true)
+            .height_request(200)
+            .build();
+        s.set_value_pos(PositionType::Bottom);
+        s
     }
 }
 
@@ -346,6 +423,21 @@ fn grid_label(text: &str, vertical: bool) -> Label {
         l.set_valign(Align::End);
     } else {
         l.set_halign(Align::End);
+    }
+    l
+}
+
+fn mixer_label(text: &str, vertical: bool) -> Label {
+    let l = Label::new(Some(text));
+    l.set_margin_top(5);
+    l.set_margin_start(5);
+    l.set_margin_bottom(5);
+    l.set_margin_end(5);
+    if vertical {
+        l.set_angle(90.0);
+        l.set_valign(Align::End);
+    } else {
+        l.set_halign(Align::Center);
     }
     l
 }
