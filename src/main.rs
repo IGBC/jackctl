@@ -1,5 +1,5 @@
 mod ui;
-mod engine;
+mod jack;
 mod model;
 mod mixer;
 
@@ -9,7 +9,7 @@ fn main() {
     }
 
     let model = model::ModelInner::new();
-    let controller = engine::Controller::new(model.clone());
+    let controller = jack::JackController::new(model.clone());
     let window = ui::init_ui(model.clone(),controller.clone());
     window.borrow().show();
     gtk::main();

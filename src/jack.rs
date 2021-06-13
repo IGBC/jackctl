@@ -8,7 +8,7 @@ use jack::PortFlags;
 
 use crate::model::{Model, Connection};
 
-pub struct Controller {
+pub struct JackController {
     model: Model,
     interface: JackClient,
     old_audio_inputs: Vec<String>,
@@ -17,9 +17,9 @@ pub struct Controller {
     old_midi_outputs: Vec<String>,
 }
 
-impl Controller {
+impl JackController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
-        let this = Rc::new(RefCell::new(Controller {
+        let this = Rc::new(RefCell::new(Self {
             model: model,
             old_audio_inputs: Vec::new(),
             old_audio_outputs: Vec::new(),

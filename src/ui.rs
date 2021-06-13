@@ -10,13 +10,13 @@ use gtk::Application;
 use glib::signal::SignalHandlerId;
 
 use crate::model::{Model, Port, PortGroup};
-use crate::engine::Controller;
+use crate::jack::JackController;
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
 pub struct MainDialog {
     state: Model,
-    controller: Rc<RefCell<Controller>>,
+    controller: Rc<RefCell<JackController>>,
 
     //builder: Builder,
     window:  Window,
@@ -39,7 +39,7 @@ where T: gtk::prelude::IsA<glib::object::Object> {
     o
 }
 
-pub fn init_ui(state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<MainDialog>> {
+pub fn init_ui(state: Model, controller: Rc<RefCell<JackController>>) -> Rc<RefCell<MainDialog>> {
     // define the gtk application with a unique name and default parameters
     let _application = Application::new(Some("jackctl.segfault"), Default::default())
     .expect("Initialization failed");
@@ -80,7 +80,7 @@ pub fn init_ui(state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<
 }
 
 impl MainDialog {
-    pub fn new(builder: Builder, state: Model, controller: Rc<RefCell<Controller>>) -> Rc<RefCell<Self>> {
+    pub fn new(builder: Builder, state: Model, controller: Rc<RefCell<JackController>>) -> Rc<RefCell<Self>> {
         // Initialise the state:
 
         // find the main dialog
