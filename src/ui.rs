@@ -23,7 +23,7 @@ struct MixerHandle {
     card_id: i32,
     element_id : MixerChannel,
     mute: Option<(CheckButton, SignalHandlerId)>,
-    volume: (Scale, SignalHandlerId),
+    volume: (Adjustment, SignalHandlerId),
 }
 
 pub struct MainDialog {
@@ -287,7 +287,7 @@ impl MainDialog {
                         1,
                     );
 
-                    let (scale, scale_signal) = self.mixer_fader(card.id, channel);
+                    let (scale, adjustment, scale_signal) = self.mixer_fader(card.id, channel);
                     grid.attach(&scale, x_pos, 1, 1, 1);
 
                     let cb_signal = if channel.has_switch {
@@ -303,7 +303,7 @@ impl MainDialog {
                         card_id: card.id,
                         element_id: channel.clone(),
                         mute: cb_signal,
-                        volume: (scale, scale_signal),
+                        volume: (adjustment, scale_signal),
                     };
                     handles.push(handle);
                 }
@@ -432,7 +432,7 @@ impl MainDialog {
         (button, signal_id)
     }
 
-    fn mixer_fader(&self, card_id: i32, chan: &MixerChannel) -> (Scale, SignalHandlerId) {
+    fn mixer_fader(&self, card_id: i32, chan: &MixerChannel) -> (Scale, Adjustment, SignalHandlerId) {
         let a = Adjustment::new(
             0.0,
             chan.volume_min as f64,
@@ -458,7 +458,7 @@ impl MainDialog {
             .height_request(200)
             .build();
         s.set_value_pos(PositionType::Bottom);
-        (s, signal)
+        (s, a, signal)
     }
 }
 
