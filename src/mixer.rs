@@ -15,7 +15,7 @@ pub struct MixerController {
 }
 
 pub struct MixerChannel {
-    pub id: SelemId,
+    id: SelemId,
     pub is_playback: bool,
     pub has_switch: bool,
     pub volume_min: i64,
@@ -24,7 +24,7 @@ pub struct MixerChannel {
 
 #[derive(Clone, Debug)]
 pub struct Card {
-    id: i32,
+    pub id: i32,
     name: String,
     channels: Vec<MixerChannel>,
 }
@@ -58,6 +58,40 @@ impl MixerController {
             model.update_mixer(&new_alsa_model);
             self.old_alsa_model = new_alsa_model;
         }
+    }
+
+    pub fn set_muting(&self, card_id: i32, channel: &MixerChannel, mute: bool) {
+        for card in self.old_alsa_model.iter() {
+            if card.id == card_id {
+                card.set_muting(channel, mute);
+            }
+        }
+    }
+
+    pub fn set_volume(&self, card_id: i32, channel: &MixerChannel, volume: i64) {
+        for card in self.old_alsa_model.iter() {
+            if card.id == card_id {
+                card.set_volume(channel, volume);
+            }
+        }
+    }
+
+    pub fn get_muting(&self, card_id: i32, channel: &MixerChannel) -> bool {
+        for card in self.old_alsa_model.iter() {
+            if card.id == card_id {
+                return card.get_muting(channel);
+            }
+        }
+        false
+    }
+
+    pub fn get_volume(&self, card_id: i32, channel: &MixerChannel) -> i64 {
+        for card in self.old_alsa_model.iter() {
+            if card.id == card_id {
+                return card.get_volume(channel);
+            }
+        };
+        0
     }
 }
 
@@ -111,6 +145,12 @@ impl MixerModel {
     }
 }
 
+impl MixerChannel {
+    pub fn get_name(&self) -> &str {
+        self.id.get_name().unwrap()
+    }
+}
+
 impl Card {
     pub fn name(&self) -> &str {
         &self.name
@@ -124,7 +164,7 @@ impl Card {
         self.channels.iter()
     }
 
-    pub fn get_volume(&mut self, channel: MixerChannel) -> i64 {
+    pub fn get_volume(&self, channel: &MixerChannel) -> i64 {
         let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
         let element = mixer.find_selem(&channel.id).unwrap();
         if channel.is_playback {
@@ -138,7 +178,22 @@ impl Card {
         }
     }
 
-    pub fn set_volume(&mut self, channel: MixerChannel, volume: i64) {
+    pub fn get_muting(&self, channel: &MixerChannel) -> bool {
+        let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
+        let element = mixer.find_selem(&channel.id).unwrap();
+        let val = if channel.is_playback {
+            element
+                .get_playback_switch(SelemChannelId::FrontLeft)
+                .unwrap()
+        } else {
+            element
+                .get_capture_switch(SelemChannelId::FrontLeft)
+                .unwrap()
+        };
+        val == 0
+    }
+
+    pub fn set_volume(&self, channel: &MixerChannel, volume: i64) {
         let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
         let element = mixer.find_selem(&channel.id).unwrap();
         if channel.is_playback {
@@ -147,6 +202,20 @@ impl Card {
             element
                 .set_capture_volume(SelemChannelId::FrontLeft, volume)
                 .unwrap()
+        }
+    }
+
+    pub fn set_muting(&self, channel: &MixerChannel, mute: bool) {
+        let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
+        let element = mixer.find_selem(&channel.id).unwrap();
+        let value = match mute {
+            true => 0,
+            false => 1,
+        };
+        if channel.is_playback {
+            element.set_playback_switch_all(value).unwrap()
+        } else {
+            element.set_capture_switch_all(value).unwrap()
         }
     }
 }

@@ -19,9 +19,17 @@ use crate::model::{Model, Port, PortGroup};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
+struct MixerHandle {
+    card_id: i32,
+    element_id : MixerChannel,
+    mute: Option<(CheckButton, SignalHandlerId)>,
+    volume: (Scale, SignalHandlerId),
+}
+
 pub struct MainDialog {
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
+    alsa_controller: Rc<RefCell<MixerController>>,
 
     //builder: Builder,
     window: Window,
@@ -36,6 +44,7 @@ pub struct MainDialog {
 
     audio_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
     midi_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
+    mixer_handles: Vec<MixerHandle>
 }
 
 fn get_object<T>(builder: &Builder, name: &str) -> T
@@ -136,6 +145,7 @@ impl MainDialog {
         let this = Rc::new(RefCell::new(MainDialog {
             state,
             jack_controller,
+            alsa_controller,
             //builder,
             window: window.clone(),
             xruns_label,
@@ -148,6 +158,7 @@ impl MainDialog {
             tabs,
             audio_matrix: Vec::new(),
             midi_matrix: Vec::new(),
+            mixer_handles: Vec::new(),
         }));
 
         // hookup the update function
@@ -247,8 +258,9 @@ impl MainDialog {
         }
     }
 
-    pub fn update_mixer(&self, cards: &MixerModel) -> Grid {
+    fn update_mixer(&self, cards: &MixerModel) -> (Grid, Vec<MixerHandle>) {
         let grid = grid();
+        let mut handles = Vec::new();
         grid.set_hexpand(true);
         grid.set_vexpand(true);
         let mut x_pos = 0;
@@ -268,27 +280,39 @@ impl MainDialog {
                 grid.attach(&mixer_label(card.name(), false), x_pos, 3, len as i32, 1);
                 for channel in card.iter() {
                     grid.attach(
-                        &mixer_label(channel.id.get_name().unwrap(), true),
+                        &mixer_label(channel.get_name(), true),
                         x_pos,
                         0,
                         1,
                         1,
                     );
 
-                    grid.attach(&self.mixer_fader(channel), x_pos, 1, 1, 1);
+                    let (scale, scale_signal) = self.mixer_fader(card.id, channel);
+                    grid.attach(&scale, x_pos, 1, 1, 1);
 
-                    if channel.has_switch {
-                        let (cb, _) = self.mixer_checkbox();
+                    let cb_signal = if channel.has_switch {
+                        let (cb, cb_signal) = self.mixer_checkbox(card.id, channel.clone());
                         grid.attach(&cb, x_pos, 2, 1, 1);
-                    }
+                        Some((cb, cb_signal))
+                    } else {
+                        None
+                    };
                     x_pos += 1;
+
+                    let handle = MixerHandle{
+                        card_id: card.id,
+                        element_id: channel.clone(),
+                        mute: cb_signal,
+                        volume: (scale, scale_signal),
+                    };
+                    handles.push(handle);
                 }
             }
             grid.attach(&Separator::new(Orientation::Vertical), x_pos, 0, 1, 4);
             x_pos += 1;
         }
 
-        grid
+        (grid, handles)
     }
 
     pub fn update_ui(&mut self) -> gtk::Inhibit {
@@ -328,10 +352,12 @@ impl MainDialog {
             self.midi_matrix = cb_vec;
 
             // update Mixer Tab
-            let mixer_matrix = self.update_mixer(model.cards());
+            let (mixer_matrix, cb_vec) = self.update_mixer(model.cards());
             self.tabs.remove_page(Some(2));
             self.tabs
                 .insert_page(&mixer_matrix, Some(&Label::new(Some("Mixer"))), Some(2));
+            self.mixer_handles = cb_vec;
+
 
             self.tabs.show_all();
 
@@ -352,6 +378,20 @@ impl MainDialog {
                 item.set_active(model.connected_by_id(j + 1000, i + 1000));
                 item.unblock_signal(handle);
             }
+        }
+
+        for element in self.mixer_handles.iter() {
+            let (item, handle) = &element.volume;
+            item.block_signal(handle);
+            item.set_value(self.alsa_controller.borrow().get_volume(element.card_id, &element.element_id) as f64);
+            item.unblock_signal(handle);
+            if element.mute.is_some() {
+                let (item, handle) = &element.mute.as_ref().unwrap();
+                item.block_signal(handle);
+                item.set_active(self.alsa_controller.borrow().get_muting(element.card_id, &element.element_id));
+                item.unblock_signal(handle);
+            }
+
         }
 
         gtk::Inhibit(false)
@@ -376,7 +416,7 @@ impl MainDialog {
         (button, signal_id)
     }
 
-    fn mixer_checkbox(&self) -> (CheckButton, SignalHandlerId) {
+    fn mixer_checkbox(&self, card_id: i32, channel: MixerChannel) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
         //button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
@@ -384,13 +424,15 @@ impl MainDialog {
         button.set_margin_bottom(5);
         button.set_margin_end(5);
 
+        let controller = self.alsa_controller.clone();
+
         let signal_id = button.connect_clicked(move |cb| {
-            
+            controller.borrow().set_muting(card_id, &channel, cb.get_active());
         });
         (button, signal_id)
     }
 
-    fn mixer_fader(&self, chan: &MixerChannel) -> Scale {
+    fn mixer_fader(&self, card_id: i32, chan: &MixerChannel) -> (Scale, SignalHandlerId) {
         let a = Adjustment::new(
             0.0,
             chan.volume_min as f64,
@@ -399,6 +441,14 @@ impl MainDialog {
             10.0,
             0.0,
         );
+
+        let controller = self.alsa_controller.clone();
+        let chan_clone = chan.clone();
+
+        let signal = a.connect_value_changed(move |a| {
+            controller.borrow().set_volume(card_id, &chan_clone, a.get_value() as i64)
+        });
+
         let s = ScaleBuilder::new()
             .adjustment(&a)
             .orientation(Orientation::Vertical)
@@ -408,7 +458,7 @@ impl MainDialog {
             .height_request(200)
             .build();
         s.set_value_pos(PositionType::Bottom);
-        s
+        (s, signal)
     }
 }
 
