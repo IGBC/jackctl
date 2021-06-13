@@ -90,7 +90,7 @@ impl MixerController {
             if card.id == card_id {
                 return card.get_volume(channel);
             }
-        };
+        }
         0
     }
 }
@@ -197,11 +197,14 @@ impl Card {
         let mixer = Mixer::new(&format!("hw:{}", self.id), false).unwrap();
         let element = mixer.find_selem(&channel.id).unwrap();
         if channel.is_playback {
-            element.set_playback_volume_all(volume).unwrap()
+            element.set_playback_volume_all(volume).unwrap();
         } else {
             element
                 .set_capture_volume(SelemChannelId::FrontLeft, volume)
-                .unwrap()
+                .unwrap();
+            element
+                .set_capture_volume(SelemChannelId::FrontRight, volume)
+                .unwrap();
         }
     }
 
