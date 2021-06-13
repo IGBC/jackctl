@@ -31,11 +31,11 @@ pub struct Connection {
 pub struct ModelInner {
     ixruns: u32,
     pub layout_dirty: bool,
-    
+
     pub cpu_percent: f32,
     pub sample_rate: usize,
     pub buffer_size: u32,
-    pub latency:     u64,
+    pub latency: u64,
 
     audio_inputs: PortGroup,
     audio_outputs: PortGroup,
@@ -51,7 +51,7 @@ impl ModelInner {
         let mixer = MixerModel::new();
         println!("MixerModel: {:?}", mixer);
 
-        Rc::new(RefCell::new(ModelInner{
+        Rc::new(RefCell::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
             cpu_percent: 0.0,
@@ -168,7 +168,10 @@ impl ModelInner {
 
 impl Group {
     pub fn new(name: String) -> Self {
-        Group { name, ports: Vec::new() }
+        Group {
+            name,
+            ports: Vec::new(),
+        }
     }
 
     pub fn add(&mut self, port: Port) {
@@ -189,10 +192,13 @@ impl Group {
 }
 
 impl Port {
-    pub fn name(&self) -> &str { &self.portname }
-    pub fn id(&self) -> usize { self.id }
+    pub fn name(&self) -> &str {
+        &self.portname
+    }
+    pub fn id(&self) -> usize {
+        self.id
+    }
 }
-
 
 impl PortGroup {
     pub fn new(is_midi: bool) -> Self {
@@ -232,12 +238,12 @@ impl PortGroup {
             }
         };
 
-        let g: &mut Group = match self.groups.iter().position( |r| r.name() == &group) {
+        let g: &mut Group = match self.groups.iter().position(|r| r.name() == &group) {
             Some(i) => &mut self.groups[i],
-            None    => {
+            None => {
                 self.groups.push(Group::new(group));
                 self.groups.last_mut().unwrap()
-            },
+            }
         };
 
         g.add(port);
@@ -252,7 +258,7 @@ impl PortGroup {
     }
 
     pub fn len(&self) -> usize {
-        self.groups.iter().map(|p|{p.len()}).sum()
+        self.groups.iter().map(|p| p.len()).sum()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -267,7 +273,7 @@ impl PortGroup {
         for g in self.groups.iter() {
             for p in g.iter() {
                 if p.id() == id {
-                    return Some([g.name(),p.name()].join(":"));
+                    return Some([g.name(), p.name()].join(":"));
                 }
             }
         }

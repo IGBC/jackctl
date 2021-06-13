@@ -1,7 +1,7 @@
-mod ui;
 mod jack;
-mod model;
 mod mixer;
+mod model;
+mod ui;
 
 fn main() {
     if gtk::init().is_err() {

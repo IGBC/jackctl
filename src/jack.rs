@@ -1,12 +1,12 @@
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use gtk::prelude::*;
 
 use jack::Client as JackClient;
 use jack::PortFlags;
 
-use crate::model::{Model, Connection};
+use crate::model::{Connection, Model};
 
 pub struct JackController {
     model: Model,
@@ -25,11 +25,16 @@ impl JackController {
             old_audio_outputs: Vec::new(),
             old_midi_inputs: Vec::new(),
             old_midi_outputs: Vec::new(),
-            interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER).unwrap().0,
+            interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER)
+                .unwrap()
+                .0,
         }));
         this.borrow_mut().update_model();
         let this_clone = this.clone();
-        glib::timeout_add_local(200, move || {this_clone.borrow_mut().update_model(); Continue(true)});
+        glib::timeout_add_local(200, move || {
+            this_clone.borrow_mut().update_model();
+            Continue(true)
+        });
 
         this
     }
@@ -74,16 +79,16 @@ impl JackController {
             model.update_audio_inputs(&ap);
             self.old_audio_inputs = ap;
         }
-        
-        // check midi ports changed 
+
+        // check midi ports changed
         if mp != self.old_midi_inputs {
             model.update_midi_inputs(&mp);
             self.old_midi_inputs = mp;
         }
-        
+
         let outputs = self.interface.ports(None, None, PortFlags::IS_OUTPUT);
         let (ap, mp) = self.split_midi_ports(outputs.clone());
-        
+
         // Check audio ports changed
         if ap != self.old_audio_outputs {
             model.update_audio_outputs(&ap);
@@ -98,7 +103,10 @@ impl JackController {
 
         let mut connections = Vec::new();
         for o in outputs.iter() {
-            let output = self.interface.port_by_name(&o).expect("should always exist");
+            let output = self
+                .interface
+                .port_by_name(&o)
+                .expect("should always exist");
             for i in inputs.iter() {
                 match output.is_connected_to(&i) {
                     Ok(true) => {
@@ -107,7 +115,7 @@ impl JackController {
                             output: o.to_owned(),
                         };
                         connections.push(c);
-                    },
+                    }
                     _ => (),
                 }
             }
@@ -117,8 +125,8 @@ impl JackController {
     }
 
     fn split_midi_ports(&self, ports: Vec<String>) -> (Vec<String>, Vec<String>) {
-        let mut audio_ports:Vec<String> = Vec::new();
-        let mut midi_ports:Vec<String> = Vec::new();
+        let mut audio_ports: Vec<String> = Vec::new();
+        let mut midi_ports: Vec<String> = Vec::new();
         for name in ports.iter() {
             let port = self.interface.port_by_name(name).unwrap();
             match port.port_type() {
@@ -126,10 +134,9 @@ impl JackController {
                     "32 bit float mono audio" => audio_ports.push(name.to_owned()),
                     "8 bit raw midi" => midi_ports.push(name.to_owned()),
                     e => println!("Unknown port format \"{}\" for port {}", e, name),
-                
                 },
                 Err(e) => println!("Could not open port {}: {}", name, e.to_string()),
-            }   
+            }
         }
         (audio_ports, midi_ports)
     }

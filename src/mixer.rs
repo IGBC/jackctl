@@ -1,11 +1,11 @@
 use gtk::prelude::*;
 
-use alsa::mixer::{Selem,SelemId,Mixer};
 use alsa::card::Iter as CardIter;
+use alsa::mixer::{Mixer, Selem, SelemId};
 
+use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use crate::model::Model;
 
@@ -29,7 +29,7 @@ pub struct Card {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MixerModel {
-    cards: Vec<Card>
+    cards: Vec<Card>,
 }
 
 impl MixerController {
@@ -38,10 +38,13 @@ impl MixerController {
             model,
             old_alsa_model: MixerModel::empty(),
         }));
-        
+
         this.borrow_mut().update_model();
         let this_clone = this.clone();
-        glib::timeout_add_local(200, move || {this_clone.borrow_mut().update_model(); Continue(true)});
+        glib::timeout_add_local(200, move || {
+            this_clone.borrow_mut().update_model();
+            Continue(true)
+        });
 
         this
     }
@@ -55,8 +58,6 @@ impl MixerController {
         }
     }
 }
-
-
 
 impl MixerModel {
     pub fn new() -> Self {
@@ -74,21 +75,17 @@ impl MixerModel {
                 })
             }
 
-            cards.push(Card{
+            cards.push(Card {
                 id: card.get_index(),
                 name: card.get_name().unwrap(),
                 channels,
             })
         }
-        Self {
-            cards
-        }
+        Self { cards }
     }
 
     pub fn empty() -> Self {
-        Self {
-            cards: Vec::new(),
-        }
+        Self { cards: Vec::new() }
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Card> {
@@ -114,8 +111,7 @@ impl fmt::Debug for MixerChannel {
 
 impl std::cmp::PartialEq for MixerChannel {
     fn eq(&self, other: &Self) -> bool {
-        self.id.get_index() == other.id.get_index() &&
-        self.id.get_name() == other.id.get_name()
+        self.id.get_index() == other.id.get_index() && self.id.get_name() == other.id.get_name()
     }
 }
 
