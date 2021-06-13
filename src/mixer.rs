@@ -1,7 +1,18 @@
+use gtk::prelude::*;
+
 use alsa::mixer::{Selem,SelemId,Mixer};
 use alsa::card::Iter as CardIter;
 
 use std::fmt;
+use std::rc::Rc;
+use std::cell::RefCell;
+
+use crate::model::Model;
+
+pub struct MixerController {
+    model: Model,
+    old_alsa_model: MixerModel,
+}
 
 pub struct MixerChannel {
     id: SelemId,
@@ -9,18 +20,43 @@ pub struct MixerChannel {
     has_volume: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Card {
     id: i32,
     name: String,
-    mixer: Mixer,
     channels: Vec<MixerChannel>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MixerModel {
     cards: Vec<Card>
 }
+
+impl MixerController {
+    pub fn new(model: Model) -> Rc<RefCell<Self>> {
+        let this = Rc::new(RefCell::new(Self {
+            model,
+            old_alsa_model: MixerModel::empty(),
+        }));
+        
+        this.borrow_mut().update_model();
+        let this_clone = this.clone();
+        glib::timeout_add_local(200, move || {this_clone.borrow_mut().update_model(); Continue(true)});
+
+        this
+    }
+
+    fn update_model(&mut self) {
+        let mut model = self.model.borrow_mut();
+        let new_alsa_model = MixerModel::new();
+        if new_alsa_model != self.old_alsa_model {
+            model.update_mixer(&new_alsa_model);
+            self.old_alsa_model = new_alsa_model;
+        }
+    }
+}
+
+
 
 impl MixerModel {
     pub fn new() -> Self {
@@ -41,7 +77,6 @@ impl MixerModel {
             cards.push(Card{
                 id: card.get_index(),
                 name: card.get_name().unwrap(),
-                mixer,
                 channels,
             })
         }
@@ -49,10 +84,22 @@ impl MixerModel {
             cards
         }
     }
+
+    pub fn empty() -> Self {
+        Self {
+            cards: Vec::new(),
+        }
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Card> {
+        self.cards.iter()
+    }
 }
 
 impl Card {
-    
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl fmt::Debug for MixerChannel {
@@ -62,5 +109,28 @@ impl fmt::Debug for MixerChannel {
             .field("has_switch", &self.has_switch)
             .field("has_volume", &self.has_volume)
             .finish()
+    }
+}
+
+impl std::cmp::PartialEq for MixerChannel {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.get_index() == other.id.get_index() &&
+        self.id.get_name() == other.id.get_name()
+    }
+}
+
+impl std::clone::Clone for MixerChannel {
+    fn clone(&self) -> Self {
+        Self {
+            has_switch: self.has_switch,
+            has_volume: self.has_volume,
+            id: SelemId::new(self.id.get_name().unwrap(), self.id.get_index()),
+        }
+    }
+}
+
+impl std::cmp::PartialEq for Card {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.name == other.name && self.channels == other.channels
     }
 }

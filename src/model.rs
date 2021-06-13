@@ -140,6 +140,15 @@ impl ModelInner {
         self.connections = connections;
     }
 
+    pub fn update_mixer(&mut self, mixer: &MixerModel) {
+        self.mixer = mixer.clone();
+        self.layout_dirty = true;
+    }
+
+    pub fn cards(&self) -> &MixerModel {
+        &self.mixer
+    }
+
     pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
         let output_name = self.outputs().get_port_name_by_id(id1);
         let input_name = self.inputs().get_port_name_by_id(id2);

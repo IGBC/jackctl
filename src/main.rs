@@ -9,8 +9,9 @@ fn main() {
     }
 
     let model = model::ModelInner::new();
-    let controller = jack::JackController::new(model.clone());
-    let window = ui::init_ui(model.clone(),controller.clone());
+    let jack_controller = jack::JackController::new(model.clone());
+    let alsa_controller = mixer::MixerController::new(model.clone());
+    let window = ui::init_ui(model.clone(), jack_controller.clone());
     window.borrow().show();
     gtk::main();
     println!("Jackctl Exiting, Goodbye");

@@ -20,16 +20,16 @@ pub struct JackController {
 impl JackController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
         let this = Rc::new(RefCell::new(Self {
-            model: model,
+            model,
             old_audio_inputs: Vec::new(),
             old_audio_outputs: Vec::new(),
             old_midi_inputs: Vec::new(),
             old_midi_outputs: Vec::new(),
             interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER).unwrap().0,
         }));
-        this.borrow_mut().update_ui();
+        this.borrow_mut().update_model();
         let this_clone = this.clone();
-        glib::timeout_add_local(200, move || {this_clone.borrow_mut().update_ui(); Continue(true)});
+        glib::timeout_add_local(200, move || {this_clone.borrow_mut().update_model(); Continue(true)});
 
         this
     }
@@ -59,7 +59,7 @@ impl JackController {
         }
     }
 
-    pub fn update_ui(&mut self) {
+    pub fn update_model(&mut self) {
         let mut model = self.model.borrow_mut();
         model.cpu_percent = self.interface.cpu_load();
         model.sample_rate = self.interface.sample_rate();

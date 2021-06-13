@@ -255,6 +255,15 @@ impl MainDialog {
             self.tabs.insert_page(&midi_matrix, Some(&Label::new(Some("MIDI"))), Some(1));
             self.midi_matrix = cb_vec;
 
+            // TODO: update Mixer Tab
+            self.tabs.remove_page(Some(2));
+            
+            let grid = grid();
+            for (i, card) in model.cards().iter().enumerate() {
+                grid.attach(&grid_label(card.name(), false), 0, i as i32, 1, 1);
+            }
+            self.tabs.insert_page(&grid, Some(&Label::new(Some("Mixer"))), Some(2));
+
             self.tabs.show_all();
             
             self.tabs.set_current_page(page);
