@@ -83,7 +83,7 @@ pub fn init_ui(
     indicator.set_status(AppIndicatorStatus::Active);
     let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     indicator.set_icon_theme_path(icon_path.to_str().unwrap());
-    indicator.set_icon_full("rust-logo-64x64-blk", "icon");
+    indicator.set_icon_full("jack-bigger", "icon");
     let mut m = gtk::Menu::new();
     let mi = gtk::CheckMenuItem::with_label("exit");
     mi.connect_activate(|_| {
