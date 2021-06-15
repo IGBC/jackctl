@@ -1,22 +1,30 @@
 # Jack Control Panel
+<img src="images/logo.png" align="right" width="128">
+
 A no fuss solution to wrangling Pro-Audio on Linux:
+
+![Audio Matrix Tab Screenshot](/images/Matrix.png)
+
+![Audio Mixer Tab Screenshot](/images/Mixer.png)
+
+## Features
+  *  Manage Jack Session
+  *  Modern Jack Patch matrix
+  *  Manage selected ALSA cards (Levels, selected inputs etc)
+  *  Professional looking GUI
+  *  Guts hidden out of site for normal users.
+
 
 ## Planned Features
 
   *  Jack Configuration wizard
-  *  Manage Jack Session
-  *  Manage selected ALSA cards (Levels, selected inputs etc)
   *  Interop between Jack and PulseAudio
 
-  *  Modern Jack Patch matrix
   *  Scene Saving and Recall (with program re-spawn)
 
   *  Embedded Secondary ALSA support
   *  Embedded Jack → ALSA & ALSA → Jack MIDI translation (Preferably Transparent)
   *  External PA <> Jack support
-
-  *  Professional looking GUI
-  *  Guts hidden out of site for normal users.
 
 ## Contributing
 
