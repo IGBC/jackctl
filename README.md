@@ -1,5 +1,6 @@
-# Jack Control Panel
 <img src="images/logo.png" align="right" width="128">
+
+# Jack Control Panel
 
 A no fuss solution to wrangling Pro-Audio on Linux:
 
