@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::fmt;
 
 use gtk::prelude::*;
 
@@ -12,7 +13,7 @@ use crate::mixer::Card;
 
 pub struct ProcessManager {
     jack_process: Option<Child>,
-    card_processes: Vec<(i32,Child)>,
+    card_processes: Vec<(i32, Child, Child)>, // ID, In, Out
 
     model: Model,
 }
@@ -63,29 +64,69 @@ impl ProcessManager {
                 self.connect_card(model_card);
             }
         }
+
+        let mut junk_list: Vec<i32> = Vec::new();
+        for card in self.card_processes.iter_mut() {
+            match card.1.try_wait() {
+                Ok(None) => (),
+                Ok(Some(code)) => {
+                    println!("Card {}: input process died {}, removing card", card.0, code);
+                    card.2.kill();
+                    junk_list.push(card.0); 
+                },
+                Err(e) => {println!("error talking to card process: {}", e)},
+            }
+
+            match card.2.try_wait() {
+                Ok(None) => (),
+                Ok(Some(code)) => {
+                    println!("Card {}: output process died {}, removing card", card.0, code);
+                    card.1.kill();
+                    junk_list.push(card.0);
+                },
+                Err(e) => {println!("error talking to card process: {}", e)},
+            }
+        }
+
+        for j in junk_list.iter() {
+            match self.card_processes.iter().position(|x| x.0 == *j) {
+                Some(i) => {
+                    self.card_processes.remove(i);
+                },
+                None => (),
+            }
+        }
     }
 
     fn connect_card(&mut self, card: &Card) -> bool {
-        let proc = Command::new("alsa_out")
+        let in_proc = Command::new("alsa_in")
         .arg("-j")
-        .arg(card.name())
+        .arg(format!("{} - Inputs",card.name()))
         .arg("-d")
         .arg(format!("hw:{}", card.id))
         .arg("-r")
         .arg("44100")
-        // .stdout(Stdio::piped())
-        // .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn();
 
-        match proc {
-            Ok(c) => {
-                self.card_processes.push((card.id, c));
-                true
-            },
-            Err(e) => {
-                println!("error connecting to card {}: {}", card.id, e);
-                false
-            }
+        let out_proc = Command::new("alsa_out")
+        .arg("-j")
+        .arg(format!("{} - Outputs",card.name()))
+        .arg("-d")
+        .arg(format!("hw:{}", card.id))
+        .arg("-r")
+        .arg("44100")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn();
+
+        if in_proc.is_ok() && out_proc.is_ok() {
+            self.card_processes.push((card.id, in_proc.unwrap(), out_proc.unwrap()));
+            true
+        } else {
+            println!("error connecting to card {}", card.id);
+            false
         }
     }
 }

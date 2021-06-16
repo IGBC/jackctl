@@ -42,8 +42,8 @@ pub struct MainDialog {
     performance_latency: Label,
     tabs: Notebook,
 
-    audio_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
-    midi_matrix: Vec<Vec<(CheckButton, SignalHandlerId)>>,
+    audio_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
+    midi_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
     mixer_handles: Vec<MixerHandle>,
 }
 
@@ -186,7 +186,7 @@ impl MainDialog {
         &self,
         inputs: &PortGroup,
         outputs: &PortGroup,
-    ) -> (Grid, Vec<Vec<(CheckButton, SignalHandlerId)>>) {
+    ) -> (Grid, Vec<(usize, usize, CheckButton, SignalHandlerId)>) {
         let grid = grid();
 
         if inputs.is_empty() || outputs.is_empty() {
@@ -240,30 +240,28 @@ impl MainDialog {
             }
 
             let mut curr_x = 2;
-            let mut x_vec = Vec::new();
+            let mut handles = Vec::new();
             for g2 in inputs.iter() {
                 for n2 in g2.iter() {
                     let mut curr_y = 2;
-                    let mut y_vec = Vec::new();
                     for g1 in outputs.iter() {
                         for n1 in g1.iter() {
-                            let (cb, handler) = self.grid_checkbox(n1, n2);
+                            let (cb, handler) = self.grid_checkbox(n2, n1);
                             grid.attach(&cb, curr_x, curr_y, 1, 1);
 
-                            y_vec.push((cb, handler));
+                            handles.push((n1.id(), n2.id(), cb, handler));
                             curr_y += 1;
                         }
                         // skip over the separator;
                         curr_y += 1;
                     }
-                    x_vec.push(y_vec);
                     curr_x += 1;
                 }
                 // skip over the separator
                 curr_x += 1;
             }
 
-            (grid, x_vec)
+            (grid, handles)
         }
     }
 
@@ -345,7 +343,7 @@ impl MainDialog {
 
             // update Audio Matrix Tab
             let (audio_matrix, cb_vec) =
-                self.update_matrix(model.audio_inputs(), model.audio_outputs());
+                self.update_matrix(model.audio_outputs(), model.audio_inputs());
             self.tabs.remove_page(Some(0));
             self.tabs
                 .insert_page(&audio_matrix, Some(&Label::new(Some("Matrix"))), Some(0));
@@ -353,7 +351,7 @@ impl MainDialog {
 
             // update Midi Matrix Tab
             let (midi_matrix, cb_vec) =
-                self.update_matrix(model.midi_inputs(), model.midi_outputs());
+                self.update_matrix(model.midi_outputs(), model.midi_inputs());
             self.tabs.remove_page(Some(1));
             self.tabs
                 .insert_page(&midi_matrix, Some(&Label::new(Some("MIDI"))), Some(1));
@@ -371,20 +369,16 @@ impl MainDialog {
             self.tabs.set_current_page(page);
         }
 
-        for (i, col) in self.audio_matrix.iter().enumerate() {
-            for (j, (item, handle)) in col.iter().enumerate() {
-                item.block_signal(handle);
-                item.set_active(model.connected_by_id(j, i));
-                item.unblock_signal(handle);
-            }
+        for (i, j, item, handle) in self.audio_matrix.iter() {
+            item.block_signal(handle);
+            item.set_active(model.connected_by_id(*j, *i));
+            item.unblock_signal(handle);
         }
 
-        for (i, col) in self.midi_matrix.iter().enumerate() {
-            for (j, (item, handle)) in col.iter().enumerate() {
-                item.block_signal(handle);
-                item.set_active(model.connected_by_id(j + 1000, i + 1000));
-                item.unblock_signal(handle);
-            }
+        for (j, i, item, handle) in self.midi_matrix.iter() {
+            item.block_signal(handle);
+            item.set_active(model.connected_by_id(*j, *i));
+            item.unblock_signal(handle);
         }
 
         for element in self.mixer_handles.iter() {
