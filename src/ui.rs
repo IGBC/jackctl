@@ -140,12 +140,6 @@ impl MainDialog {
         // Setup about screen
         let about: Window = get_object(&builder, "aboutdialog");
 
-        // Setup Main Menu
-        let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
-        quit.connect_clicked(|_| gtk::main_quit());
-        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
-        aboutbutton.connect_clicked(move |_| about.show_all());
-
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,
@@ -168,6 +162,16 @@ impl MainDialog {
 
         // hookup the update function
         let this_clone = this.clone();
+
+        // Setup Main Menu
+        let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
+        quit.connect_clicked(|_| gtk::main_quit());
+        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");     
+        aboutbutton.connect_clicked(move |_| this_clone.borrow().show());
+
+        // hookup the update function
+        let this_clone = this.clone();
+
         window.connect_draw(move |_, _| this_clone.borrow_mut().update_ui());
 
         this

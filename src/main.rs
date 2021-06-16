@@ -10,10 +10,11 @@ fn main() {
             println!("Failed to start GTK, please ensure all dependancies are installed");
         }
 
-        ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
+        // ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
 
-        let proc_manager = process_manager::ProcessManager::new();
         let model = model::ModelInner::new();
+
+        let proc_manager = process_manager::ProcessManager::new(model.clone());
         let jack_controller = jack::JackController::new(model.clone());
         let alsa_controller = mixer::MixerController::new(model.clone());
         let window = ui::init_ui(

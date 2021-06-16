@@ -43,7 +43,7 @@ pub struct ModelInner {
     midi_outputs: PortGroup,
     connections: Vec<Connection>,
 
-    mixer: MixerModel,
+    pub mixer: MixerModel,
 }
 
 impl ModelInner {

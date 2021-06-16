@@ -1,5 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::thread;
+use std::time::Duration;
 
 use gtk::prelude::*;
 
@@ -19,15 +21,23 @@ pub struct JackController {
 
 impl JackController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
+        let interface = loop {
+            match JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER) {
+                Ok(i) => { break i.0; },
+                Err(e) => { 
+                    println!("{:?}", e);
+                    thread::sleep(Duration::from_secs(2));
+                },
+            }
+        };
+                 
         let this = Rc::new(RefCell::new(Self {
             model,
             old_audio_inputs: Vec::new(),
             old_audio_outputs: Vec::new(),
             old_midi_inputs: Vec::new(),
             old_midi_outputs: Vec::new(),
-            interface: JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER)
-                .unwrap()
-                .0,
+            interface
         }));
         this.borrow_mut().update_model();
         let this_clone = this.clone();
