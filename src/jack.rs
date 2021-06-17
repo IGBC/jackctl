@@ -84,6 +84,9 @@ impl JackController {
 
         let inputs = self.interface.ports(None, None, PortFlags::IS_INPUT);
         let (ap, mp) = self.split_midi_ports(inputs.clone());
+
+        let ap = self.filter_ports(ap);
+
         //Check audio ports changed
         if ap != self.old_audio_inputs {
             model.update_audio_inputs(&ap);
@@ -98,6 +101,8 @@ impl JackController {
 
         let outputs = self.interface.ports(None, None, PortFlags::IS_OUTPUT);
         let (ap, mp) = self.split_midi_ports(outputs.clone());
+
+        let ap = self.filter_ports(ap);
 
         // Check audio ports changed
         if ap != self.old_audio_outputs {
@@ -149,5 +154,25 @@ impl JackController {
             }
         }
         (audio_ports, midi_ports)
+    }
+
+    fn filter_ports(&self, ports: Vec<String>) -> Vec<String> {
+        let mut hard_ports = Vec::new();
+        let mut soft_ports = Vec::new();
+
+        for i in ports.iter() {
+            let g: &str = i.split(':').collect::<Vec<&str>>()[0];
+            if g.ends_with(" - Outputs") || g.ends_with(" - Inputs") {
+                hard_ports.push(i.clone());
+            } else {
+                if g != "system" {
+                    soft_ports.push(i.clone());
+                }
+            }
+        }
+
+        let mut out = hard_ports;
+        out.append(&mut soft_ports);
+        out
     }
 }
