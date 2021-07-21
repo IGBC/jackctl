@@ -1,32 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::mixer::MixerModel;
+use std::collections::HashMap;
+
+mod card;
+mod port;
+
+pub use card::*;
+pub use port::*;
 
 pub type Model = Rc<RefCell<ModelInner>>;
-
-pub struct PortGroup {
-    is_midi: bool,
-    groups: Vec<Group>,
-}
-
-#[derive(Clone)]
-pub struct Group {
-    name: String,
-    ports: Vec<Port>,
-}
-
-#[derive(Clone)]
-pub struct Port {
-    portname: String,
-    id: usize,
-}
-
-#[derive(Debug)]
-pub struct Connection {
-    pub input: String,
-    pub output: String,
-}
 
 pub struct ModelInner {
     ixruns: u32,
@@ -43,12 +26,11 @@ pub struct ModelInner {
     midi_outputs: PortGroup,
     connections: Vec<Connection>,
 
-    pub mixer: MixerModel,
+    pub cards: HashMap<i32, Card>,
 }
 
 impl ModelInner {
     pub fn new() -> Model {
-        let mixer = MixerModel::new();
         Rc::new(RefCell::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
@@ -63,7 +45,7 @@ impl ModelInner {
             midi_outputs: PortGroup::new(true),
             connections: Vec::new(),
 
-            mixer,
+            cards: HashMap::new(),
         }))
     }
 
@@ -137,13 +119,11 @@ impl ModelInner {
         self.connections = connections;
     }
 
-    pub fn update_mixer(&mut self, mixer: &MixerModel) {
-        self.mixer = mixer.clone();
-        self.layout_dirty = true;
-    }
-
-    pub fn cards(&self) -> &MixerModel {
-        &self.mixer
+    // call when a card is to be added to the system that has not been seen before.
+    pub fn card_detected(&mut self, id: i32, name: String) {
+        println!("Found Unseen Card hw:{} - {}", id, name);
+        let card = Card::new(id, name);
+        self.cards.insert(id, card);
     }
 
     pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
@@ -161,119 +141,48 @@ impl ModelInner {
         }
         false
     }
-}
 
-impl Group {
-    pub fn new(name: String) -> Self {
-        Group {
-            name,
-            ports: Vec::new(),
-        }
-    }
-
-    pub fn add(&mut self, port: Port) {
-        self.ports.push(port)
-    }
-
-    pub fn len(&self) -> usize {
-        self.ports.len()
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<'_, Port> {
-        self.ports.iter()
-    }
-}
-
-impl Port {
-    pub fn name(&self) -> &str {
-        &self.portname
-    }
-    pub fn id(&self) -> usize {
-        self.id
-    }
-}
-
-impl PortGroup {
-    pub fn new(is_midi: bool) -> Self {
-        PortGroup {
-            is_midi,
-            groups: Vec::new(),
-        }
-    }
-
-    pub fn merge(&self, rhs: &Self) -> Self {
-        let mut pg = Self::new(false);
-        for i in self.iter() {
-            pg.add_group(i.clone());
-        }
-
-        for i in rhs.iter() {
-            pg.add_group(i.clone());
-        }
-
-        pg
-    }
-
-    pub fn add(&mut self, name: &str) {
-        let mut parts: Vec<&str> = name.split(':').collect();
-        let group: String = parts.remove(0).to_owned();
-        let portname = parts.join(":");
-
-        let port = if self.is_midi {
-            Port {
-                portname,
-                id: self.len() + 1000,
-            }
-        } else {
-            Port {
-                portname,
-                id: self.len(),
-            }
-        };
-
-        let g: &mut Group = match self.groups.iter().position(|r| r.name() == &group) {
-            Some(i) => &mut self.groups[i],
-            None => {
-                self.groups.push(Group::new(group));
-                self.groups.last_mut().unwrap()
-            }
-        };
-
-        g.add(port);
-    }
-
-    fn add_group(&mut self, group: Group) {
-        self.groups.push(group);
-    }
-
-    pub fn no_groups(&self) -> usize {
-        self.groups.len()
-    }
-
-    pub fn len(&self) -> usize {
-        self.groups.iter().map(|p| p.len()).sum()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.groups.is_empty()
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<'_, Group> {
-        self.groups.iter()
-    }
-
-    pub fn get_port_name_by_id(&self, id: usize) -> Option<String> {
-        for g in self.groups.iter() {
-            for p in g.iter() {
-                if p.id() == id {
-                    return Some([g.name(), p.name()].join(":"));
-                }
+    pub fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
+        let card = self.cards.get_mut(&card_id);
+        if card.is_some() {
+            let card = card.unwrap();
+            let channel = card.channels.get_mut(&channel);
+            if channel.is_some() {
+                channel.unwrap().switch = mute;
             }
         }
-        None
+    }
+
+    pub fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
+        let card = self.cards.get_mut(&card_id);
+        if card.is_some() {
+            let card = card.unwrap();
+            let channel = card.channels.get_mut(&channel);
+            if channel.is_some() {
+                channel.unwrap().volume = volume;
+            }
+        }
+    }
+
+    pub fn get_muting(&self, card_id: i32, channel: u32) -> bool {
+        match self.cards.get(&card_id) {
+            Some(card) => match card.channels.get(&channel) {
+                Some(channel) => channel.switch,
+                None => false,
+            },
+            None => false,
+        }
+    }
+
+    pub fn get_volume(&self, card_id: i32, channel: u32) -> i64 {
+        match self.cards.get(&card_id) {
+            Some(card) => match card.channels.get(&channel) {
+                Some(channel) => channel.volume,
+                None => 0,
+            },
+            None => 0,
+        }
     }
 }
+
+

@@ -1,15 +1,15 @@
 use psutil::process;
+use std::cell::RefCell;
+use std::fmt;
 use std::process::{Child, Command, Stdio};
+use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::fmt;
 
 use gtk::prelude::*;
 
+use crate::model::Card;
 use crate::model::Model;
-use crate::mixer::Card;
 
 pub struct ProcessManager {
     jack_process: Option<Child>,
@@ -17,7 +17,6 @@ pub struct ProcessManager {
 
     model: Model,
 }
-
 
 impl ProcessManager {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
@@ -56,9 +55,13 @@ impl ProcessManager {
     }
 
     fn update_processes(&mut self) {
-        let mixer = self.model.borrow().mixer.clone();
-        for model_card in mixer.iter() {
-            let proc_present = self.card_processes.iter().position(|x| x.0 == model_card.id).is_some();
+        let model = self.model.clone();
+        for model_card in model.borrow().cards.values() {
+            let proc_present = self
+                .card_processes
+                .iter()
+                .position(|x| x.0 == model_card.id)
+                .is_some();
 
             if !proc_present {
                 self.connect_card(model_card);
@@ -70,21 +73,27 @@ impl ProcessManager {
             match card.1.try_wait() {
                 Ok(None) => (),
                 Ok(Some(code)) => {
-                    println!("Card {}: input process died {}, removing card", card.0, code);
+                    println!(
+                        "Card {}: input process died {}, removing card",
+                        card.0, code
+                    );
                     card.2.kill();
-                    junk_list.push(card.0); 
-                },
-                Err(e) => {println!("error talking to card process: {}", e)},
+                    junk_list.push(card.0);
+                }
+                Err(e) => println!("error talking to card process: {}", e),
             }
 
             match card.2.try_wait() {
                 Ok(None) => (),
                 Ok(Some(code)) => {
-                    println!("Card {}: output process died {}, removing card", card.0, code);
+                    println!(
+                        "Card {}: output process died {}, removing card",
+                        card.0, code
+                    );
                     card.1.kill();
                     junk_list.push(card.0);
-                },
-                Err(e) => {println!("error talking to card process: {}", e)},
+                }
+                Err(e) => println!("error talking to card process: {}", e),
             }
         }
 
@@ -92,7 +101,7 @@ impl ProcessManager {
             match self.card_processes.iter().position(|x| x.0 == *j) {
                 Some(i) => {
                     self.card_processes.remove(i);
-                },
+                }
                 None => (),
             }
         }
@@ -100,29 +109,26 @@ impl ProcessManager {
 
     fn connect_card(&mut self, card: &Card) -> bool {
         let in_proc = Command::new("alsa_in")
-        .arg("-j")
-        .arg(format!("{} - Inputs",card.name()))
-        .arg("-d")
-        .arg(format!("hw:{}", card.id))
-        .arg("-r")
-        .arg("44100")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+            .arg("-j")
+            .arg(format!("{} - Inputs", card.name()))
+            .arg("-d")
+            .arg(format!("hw:{}", card.id))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
 
         let out_proc = Command::new("alsa_out")
-        .arg("-j")
-        .arg(format!("{} - Outputs",card.name()))
-        .arg("-d")
-        .arg(format!("hw:{}", card.id))
-        .arg("-r")
-        .arg("44100")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+            .arg("-j")
+            .arg(format!("{} - Outputs", card.name()))
+            .arg("-d")
+            .arg(format!("hw:{}", card.id))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
 
         if in_proc.is_ok() && out_proc.is_ok() {
-            self.card_processes.push((card.id, in_proc.unwrap(), out_proc.unwrap()));
+            self.card_processes
+                .push((card.id, in_proc.unwrap(), out_proc.unwrap()));
             true
         } else {
             println!("error connecting to card {}", card.id);
@@ -147,7 +153,11 @@ fn process_is_running(name: &str) -> bool {
     {
         match process {
             Ok(process) => {
-                if process.name().map_err(|_| "").unwrap() == name {
+                let proc_name = match process.name() {
+                    Ok(n) => n,
+                    Err(_) => "".to_owned(),
+                };
+                if proc_name == name {
                     return true;
                 }
             }

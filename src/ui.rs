@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::env;
 use std::path::Path;
 use std::rc::Rc;
+use std::cell;
 
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
@@ -12,16 +13,16 @@ use gtk::{
     PositionType, Scale, ScaleBuilder, Separator, Window,
 };
 
-use crate::mixer::{MixerChannel, MixerController, MixerModel};
+use crate::mixer::MixerController;
 
 use crate::jack::JackController;
-use crate::model::{Model, Port, PortGroup};
+use crate::model::{Model, ModelInner, Port, PortGroup, MixerChannel};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
 struct MixerHandle {
     card_id: i32,
-    element_id: MixerChannel,
+    element_id: u32,
     mute: Option<(CheckButton, SignalHandlerId)>,
     volume: (Adjustment, SignalHandlerId),
 }
@@ -166,7 +167,7 @@ impl MainDialog {
         // Setup Main Menu
         let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
         quit.connect_clicked(|_| gtk::main_quit());
-        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");     
+        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
         aboutbutton.connect_clicked(move |_| this_clone.borrow().show());
 
         // hookup the update function
@@ -265,13 +266,13 @@ impl MainDialog {
         }
     }
 
-    fn update_mixer(&self, cards: &MixerModel) -> (Grid, Vec<MixerHandle>) {
+    fn update_mixer(&self, model: &cell::RefMut<ModelInner>) -> (Grid, Vec<MixerHandle>) {
         let grid = grid();
         let mut handles = Vec::new();
         grid.set_hexpand(true);
         grid.set_vexpand(true);
         let mut x_pos = 0;
-        for card in cards.iter() {
+        for card in model.cards.values() {
             let len = card.len();
             if len == 0 {
                 grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
@@ -292,7 +293,7 @@ impl MainDialog {
                     grid.attach(&scale, x_pos, 1, 1, 1);
 
                     let cb_signal = if channel.has_switch {
-                        let (cb, cb_signal) = self.mixer_checkbox(card.id, channel.clone());
+                        let (cb, cb_signal) = self.mixer_checkbox(card.id, channel.id);
                         grid.attach(&cb, x_pos, 2, 1, 1);
                         Some((cb, cb_signal))
                     } else {
@@ -302,7 +303,7 @@ impl MainDialog {
 
                     let handle = MixerHandle {
                         card_id: card.id,
-                        element_id: channel.clone(),
+                        element_id: channel.id,
                         mute: cb_signal,
                         volume: (adjustment, scale_signal),
                     };
@@ -358,7 +359,7 @@ impl MainDialog {
             self.midi_matrix = cb_vec;
 
             // update Mixer Tab
-            let (mixer_matrix, cb_vec) = self.update_mixer(model.cards());
+            let (mixer_matrix, cb_vec) = self.update_mixer(&model);
             self.tabs.remove_page(Some(2));
             self.tabs
                 .insert_page(&mixer_matrix, Some(&Label::new(Some("Mixer"))), Some(2));
@@ -385,18 +386,14 @@ impl MainDialog {
             let (item, handle) = &element.volume;
             item.block_signal(handle);
             item.set_value(
-                self.alsa_controller
-                    .borrow()
-                    .get_volume(element.card_id, &element.element_id) as f64,
+                model.get_volume(element.card_id, element.element_id) as f64,
             );
             item.unblock_signal(handle);
             if element.mute.is_some() {
                 let (item, handle) = &element.mute.as_ref().unwrap();
                 item.block_signal(handle);
                 item.set_active(
-                    self.alsa_controller
-                        .borrow()
-                        .get_muting(element.card_id, &element.element_id),
+                    model.get_muting(element.card_id, element.element_id),
                 );
                 item.unblock_signal(handle);
             }
@@ -423,7 +420,7 @@ impl MainDialog {
     fn mixer_checkbox(
         &self,
         card_id: i32,
-        channel: MixerChannel,
+        channel: u32,
     ) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
         //button.set_active(model.connected_by_id(port1.id(), port2.id()));
@@ -432,12 +429,12 @@ impl MainDialog {
         button.set_margin_bottom(5);
         button.set_margin_end(5);
 
-        let controller = self.alsa_controller.clone();
+        let model = self.state.clone();
 
         let signal_id = button.connect_clicked(move |cb| {
-            controller
-                .borrow()
-                .set_muting(card_id, &channel, cb.get_active());
+            model
+                .borrow_mut()
+                .set_muting(card_id, channel, cb.get_active());
         });
         (button, signal_id)
     }
@@ -456,13 +453,13 @@ impl MainDialog {
             0.0,
         );
 
-        let controller = self.alsa_controller.clone();
-        let chan_clone = chan.clone();
+        let model = self.state.clone();
+        let chan_id = chan.id;
 
         let signal = a.connect_value_changed(move |a| {
-            controller
-                .borrow()
-                .set_volume(card_id, &chan_clone, a.get_value() as i64)
+            model
+                .borrow_mut()
+                .set_volume(card_id, chan_id, a.get_value() as i64)
         });
 
         let s = ScaleBuilder::new()
