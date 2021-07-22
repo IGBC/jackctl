@@ -9,7 +9,7 @@ use alsa::{Direction, ValueOr};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::model::{Model, CardStatus};
+use crate::model::{CardStatus, Model};
 
 pub struct MixerController {
     model: Model,
@@ -79,30 +79,29 @@ impl MixerController {
         //         }
         //     }
 
-            // use std::ffi::CString;
-            // use alsa::hctl::HCtl;
-            // let h = HCtl::open(&CString::new(format!("hw:{}", a.get_index())).unwrap(), false).unwrap();
-            // h.load().unwrap();
-            // for b in h.elem_iter() {
-            //     use alsa::ctl::ElemIface;
-            //     let id = b.get_id().unwrap();
-            //     let name = id.get_name().unwrap();
-            //     let value = b.read().unwrap();
-            //     println!("hw:{} {} = {:?}", a.get_index(), &name, value);
+        // use std::ffi::CString;
+        // use alsa::hctl::HCtl;
+        // let h = HCtl::open(&CString::new(format!("hw:{}", a.get_index())).unwrap(), false).unwrap();
+        // h.load().unwrap();
+        // for b in h.elem_iter() {
+        //     use alsa::ctl::ElemIface;
+        //     let id = b.get_id().unwrap();
+        //     let name = id.get_name().unwrap();
+        //     let value = b.read().unwrap();
+        //     println!("hw:{} {} = {:?}", a.get_index(), &name, value);
 
-            //     if !name.ends_with(" Jack") { continue; }
-            //     if name.ends_with(" Phantom Jack") {
-            //         println!("{} is always present", &name[..name.len()-13])
-            //     }
-            //     else { println!("{} is {}", &name[..name.len()-5],
-            //         if b.read().unwrap().get_boolean(0).unwrap() { "plugged in" } else { "unplugged" })
-            //     }
-            // }
+        //     if !name.ends_with(" Jack") { continue; }
+        //     if name.ends_with(" Phantom Jack") {
+        //         println!("{} is always present", &name[..name.len()-13])
+        //     }
+        //     else { println!("{} is {}", &name[..name.len()-5],
+        //         if b.read().unwrap().get_boolean(0).unwrap() { "plugged in" } else { "unplugged" })
+        //     }
+        // }
         // }
 
         let this = Rc::new(RefCell::new(Self { model }));
 
-        this.borrow_mut().update();
         let this_clone = this.clone();
         glib::timeout_add_local(200, move || {
             this_clone.borrow_mut().update();
@@ -117,7 +116,9 @@ impl MixerController {
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
-                self.model.borrow_mut().card_detected(alsa_card.get_index(), alsa_card.get_name().unwrap());
+                self.model
+                    .borrow_mut()
+                    .card_detected(alsa_card.get_index(), alsa_card.get_name().unwrap());
             }
         }
 
@@ -141,29 +142,41 @@ impl MixerController {
                 }
 
                 if card.inputs.is_some() || card.outputs.is_some() {
-                    
                     // this is the old mixer enumeration code, but we're only running it once.
                     // pray that cards do not dynamically change their mixer interfaces.
                     let mixer = Mixer::new(&format!("hw:{}", card.id), false).unwrap();
-                    
-                    for channel in mixer.iter() {
+
+                    for (id, channel) in mixer.iter().enumerate() {
+                        let id = id as u32;
                         let s = Selem::new(channel).unwrap();
-                        
-                        let id = s.get_id();
-                        let name = id.get_name().unwrap().to_string();
-                        
+
+                        let name = s.get_id().get_name().unwrap().to_string();
+                        println!("Card {}, id {}, name: {}", card.id, id, name);
 
                         if s.has_capture_volume() {
                             let (volume_min, volume_max) = s.get_capture_volume_range();
-                            card.add_channel(id.get_index(),name, false, s.has_capture_switch(), volume_min, volume_max);
+                            card.add_channel(
+                                id,
+                                name,
+                                false,
+                                s.has_capture_switch(),
+                                volume_min,
+                                volume_max,
+                            );
                         } else {
                             if s.has_playback_volume() {
                                 let (volume_min, volume_max) = s.get_playback_volume_range();
-                                card.add_channel(id.get_index(),name, false, s.has_playback_switch(), volume_min, volume_max);
+                                card.add_channel(
+                                    id,
+                                    name,
+                                    false,
+                                    s.has_playback_switch(),
+                                    volume_min,
+                                    volume_max,
+                                );
                             }
                         };
                     }
-
 
                     card.state = CardStatus::Active;
                 } else {
@@ -172,7 +185,7 @@ impl MixerController {
                 }
             }
         }
-    } 
+    }
 
     fn attempt_playback_enumerate(&self, card: i32) -> alsa::Result<Vec<u32>> {
         // Open playback device
@@ -204,9 +217,9 @@ impl MixerController {
         Ok(results)
     }
 
-    fn pick_best_rate(& self, rates: &Vec<u32>) -> u32 {
+    fn pick_best_rate(&self, rates: &Vec<u32>) -> u32 {
         if rates.contains(&48000) {
-            44100
+            48000
         } else if rates.contains(&44100) {
             44100
         } else {
