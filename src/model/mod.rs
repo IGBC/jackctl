@@ -148,7 +148,9 @@ impl ModelInner {
             let card = card.unwrap();
             let channel = card.channels.get_mut(&channel);
             if channel.is_some() {
-                channel.unwrap().switch = mute;
+                let mut channel = channel.unwrap();
+                channel.switch = mute;
+                channel.dirty = true;
             }
         }
     }
@@ -159,7 +161,9 @@ impl ModelInner {
             let card = card.unwrap();
             let channel = card.channels.get_mut(&channel);
             if channel.is_some() {
-                channel.unwrap().volume = volume;
+                let mut channel = channel.unwrap();
+                channel.volume = volume;
+                channel.dirty = true;
             }
         }
     }

@@ -31,6 +31,8 @@ pub struct MixerChannel {
 
     pub volume: i64,
     pub switch: bool,
+
+    pub dirty: bool,
 }
 
 impl MixerChannel {
@@ -93,6 +95,7 @@ impl Card {
             volume_max,
             volume: 0,
             switch: false,
+            dirty: false,
         };
         self.channels.insert(id, channel);
     }

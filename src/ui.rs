@@ -272,7 +272,10 @@ impl MainDialog {
         grid.set_hexpand(true);
         grid.set_vexpand(true);
         let mut x_pos = 0;
-        for card in model.cards.values() {
+        // get the elements in order.
+        let mut keys: Vec<&i32> = model.cards.keys().collect();
+        keys.sort();
+        for card in keys.iter().map(|k| model.cards.get(*k).unwrap()) {
             let len = card.len();
             if len == 0 {
                 grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
@@ -286,7 +289,12 @@ impl MainDialog {
                 x_pos += 1;
             } else {
                 grid.attach(&mixer_label(card.name(), false), x_pos, 3, len as i32, 1);
-                for channel in card.iter() {
+
+                // get the card in order, for consistency with things like alsamixer.
+                let mut keys: Vec<&MixerChannel> = card.iter().collect();
+                keys.sort_by(|a, b| a.id.cmp(&b.id));
+
+                for channel in keys {
                     grid.attach(&mixer_label(channel.get_name(), true), x_pos, 0, 1, 1);
 
                     let (scale, adjustment, scale_signal) = self.mixer_fader(card.id, channel);
