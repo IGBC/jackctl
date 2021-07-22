@@ -129,7 +129,8 @@ impl ProcessManager {
                     .arg(format!("{} - Inputs", card.name()))
                     .arg("-d")
                     .arg(format!("hw:{}", card.id))
-                    .arg("-r").arg(format!("{}", rate))
+                    .arg("-r")
+                    .arg(format!("{}", rate))
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .spawn()?,
@@ -147,7 +148,8 @@ impl ProcessManager {
                     .arg(format!("{} - Outputs", card.name()))
                     .arg("-d")
                     .arg(format!("hw:{}", card.id))
-                    .arg("-r").arg(format!("{}", rate))
+                    .arg("-r")
+                    .arg(format!("{}", rate))
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .spawn()?,

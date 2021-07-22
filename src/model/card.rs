@@ -75,7 +75,15 @@ impl Card {
         }
     }
 
-    pub fn add_channel(&mut self, id: u32, name: String, is_playback: bool, has_switch: bool, volume_min: i64, volume_max: i64) {
+    pub fn add_channel(
+        &mut self,
+        id: u32,
+        name: String,
+        is_playback: bool,
+        has_switch: bool,
+        volume_min: i64,
+        volume_max: i64,
+    ) {
         let channel = MixerChannel {
             id,
             name,
@@ -97,7 +105,9 @@ impl Card {
         self.channels.len()
     }
 
-    pub fn iter(&self) -> std::collections::hash_map::Values<'_, u32, crate::model::card::MixerChannel> {
+    pub fn iter(
+        &self,
+    ) -> std::collections::hash_map::Values<'_, u32, crate::model::card::MixerChannel> {
         self.channels.values()
     }
 }

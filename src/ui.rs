@@ -1,8 +1,8 @@
+use std::cell;
 use std::cell::RefCell;
 use std::env;
 use std::path::Path;
 use std::rc::Rc;
-use std::cell;
 
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
@@ -16,7 +16,7 @@ use gtk::{
 use crate::mixer::MixerController;
 
 use crate::jack::JackController;
-use crate::model::{Model, ModelInner, Port, PortGroup, MixerChannel};
+use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
@@ -385,16 +385,12 @@ impl MainDialog {
         for element in self.mixer_handles.iter() {
             let (item, handle) = &element.volume;
             item.block_signal(handle);
-            item.set_value(
-                model.get_volume(element.card_id, element.element_id) as f64,
-            );
+            item.set_value(model.get_volume(element.card_id, element.element_id) as f64);
             item.unblock_signal(handle);
             if element.mute.is_some() {
                 let (item, handle) = &element.mute.as_ref().unwrap();
                 item.block_signal(handle);
-                item.set_active(
-                    model.get_muting(element.card_id, element.element_id),
-                );
+                item.set_active(model.get_muting(element.card_id, element.element_id));
                 item.unblock_signal(handle);
             }
         }
@@ -417,11 +413,7 @@ impl MainDialog {
         (button, signal_id)
     }
 
-    fn mixer_checkbox(
-        &self,
-        card_id: i32,
-        channel: u32,
-    ) -> (CheckButton, SignalHandlerId) {
+    fn mixer_checkbox(&self, card_id: i32, channel: u32) -> (CheckButton, SignalHandlerId) {
         let button = CheckButton::new();
         //button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
