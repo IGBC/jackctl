@@ -6,6 +6,8 @@ use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
+use std::panic;
+use std::process::abort;
 
 use gtk::prelude::*;
 
@@ -35,8 +37,34 @@ impl CardEntry {
     }
 }
 
+static mut jackctl_spawned_server: bool = false;
+
+
+fn panic_kill(info: &panic::PanicInfo) -> ! {
+    // logs "panicked at '$reason', src/main.rs:27:4" to the host stderr
+    eprintln!("{}", info);
+
+    eprintln!("Killing children (violently)");
+    Command::new("killall").arg("-9").arg("alsa_in").spawn();
+    Command::new("killall").arg("-9").arg("alsa_out").spawn();
+    unsafe {
+        if jackctl_spawned_server {
+            eprintln!("Killing Local Server");
+            Command::new("killall").arg("-9").arg("jackd").spawn();
+        }
+    }
+
+    abort();
+}
+
+
 impl ProcessManager {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
+        
+        panic::set_hook(Box::new(|pi| {
+            panic_kill(pi);
+        }));
+
         println!("process mananager new");
         let jack_process = if process_is_running("jackd") || process_is_running("jackdbus") {
             None
@@ -51,6 +79,9 @@ impl ProcessManager {
                 .expect("Failed to start jack server");
 
             //wait for jack to start,
+            unsafe {
+                jackctl_spawned_server = true;
+            }
             thread::sleep(Duration::from_secs(1));
             Some(jack_proc)
         };
@@ -158,12 +189,26 @@ impl ProcessManager {
         };
         Ok(out_proc)
     }
-}
 
-impl Drop for ProcessManager {
-    fn drop(&mut self) {
+    pub fn end(&mut self) {
+        for card in self.card_processes.values_mut() {
+            println!("releasing card {}", card.id);
+            let _ = match &mut card.in_proc {
+                Some(p) => p.kill(),
+                None => Ok(()),
+            };
+
+            let _ = match &mut card.out_proc {
+                Some(p) => p.kill(),
+                None => Ok(()),
+            };
+        }
+
         let _ = match &mut self.jack_process {
-            Some(p) => p.kill(),
+            Some(p) => {
+                println!("stopping server");
+                p.kill()
+            },
             None => Ok(()),
         };
     }

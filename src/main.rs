@@ -10,7 +10,8 @@ fn main() {
             println!("Failed to start GTK, please ensure all dependancies are installed");
         }
 
-        // ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
+        // due to a bug this button is basically panic on demand, however it does the job.
+        ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
 
         let model = model::ModelInner::new();
 
@@ -24,6 +25,7 @@ fn main() {
         );
         window.borrow().show();
         gtk::main();
+        proc_manager.borrow_mut().end();
     }
 
     println!("Jackctl Exiting, Goodbye");
