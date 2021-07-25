@@ -84,7 +84,7 @@ pub fn init_ui(
     indicator.set_status(AppIndicatorStatus::Active);
     let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     indicator.set_icon_theme_path(icon_path.to_str().unwrap());
-    indicator.set_icon_full("jack-bigger", "icon");
+    indicator.set_icon_full("jackctl-symbolic", "icon");
     let mut m = gtk::Menu::new();
     let mi = gtk::CheckMenuItem::with_label("exit");
     mi.connect_activate(|_| {
@@ -206,7 +206,9 @@ impl MainDialog {
 
             let mut curr_x = 2;
             for (i, g) in inputs.iter().enumerate() {
-                grid.attach(&grid_label(g.name(), true), curr_x, 0, g.len() as i32, 1);
+                let l = grid_label(g.name(), true);
+                l.set_line_wrap(true);
+                grid.attach(&l, curr_x, 0, g.len() as i32, 1);
 
                 for n in g.iter() {
                     grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
@@ -221,7 +223,9 @@ impl MainDialog {
 
             let mut curr_y = 2;
             for (i, g) in outputs.iter().enumerate() {
-                grid.attach(&grid_label(g.name(), false), 0, curr_y, 1, g.len() as i32);
+                let l = grid_label(g.name(), false);
+                l.set_line_wrap(true);
+                grid.attach(&l, 0, curr_y, 1, g.len() as i32);
 
                 for n in g.iter() {
                     grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
@@ -271,6 +275,11 @@ impl MainDialog {
         let mut handles = Vec::new();
         grid.set_hexpand(true);
         grid.set_vexpand(true);
+        if model.cards.is_empty() {
+            grid.attach(&mixer_label("No controllable devices are detected.", false), 0,0,1,1);
+            return (grid, handles);
+        }
+
         let mut x_pos = 0;
         // get the elements in order.
         let mut keys: Vec<&i32> = model.cards.keys().collect();
