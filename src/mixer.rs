@@ -23,6 +23,11 @@ const SAMPLE_RATES: [u32; 9] = [
     8000, 16000, 32000, 44100, 48000, 88200, 96000, 176400, 192000,
 ];
 
+pub type CardId = i32;
+pub type ChannelId = u32;
+pub type Volume = i64;
+pub type SampleRate = u32;
+
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
         let this = Rc::new(RefCell::new(Self { model }));
@@ -37,7 +42,7 @@ impl MixerController {
     }
 
     fn update(&mut self) {
-        let card_ids: Vec<i32> = self.model.borrow().cards.keys().map(|x| *x).collect();
+        let card_ids: Vec<CardId> = self.model.borrow().cards.keys().map(|x| *x).collect();
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
@@ -149,7 +154,7 @@ impl MixerController {
         }
     }
 
-    fn attempt_playback_enumerate(&self, card: i32) -> alsa::Result<Vec<u32>> {
+    fn attempt_playback_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
         // Open playback device
         let mut results = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Playback, false)?;
@@ -164,7 +169,7 @@ impl MixerController {
         Ok(results)
     }
 
-    fn attempt_capture_enumerate(&self, card: i32) -> alsa::Result<Vec<u32>> {
+    fn attempt_capture_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
         // Open capture device
         let mut results = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Capture, false)?;
@@ -179,7 +184,7 @@ impl MixerController {
         Ok(results)
     }
 
-    fn pick_best_rate(&self, rates: &Vec<u32>) -> u32 {
+    fn pick_best_rate(&self, rates: &Vec<SampleRate>) -> SampleRate {
         if rates.contains(&48000) {
             48000
         } else if rates.contains(&44100) {
@@ -189,7 +194,7 @@ impl MixerController {
         }
     }
 
-    pub fn get_volume(playback: bool, channel: &Selem) -> i64 {
+    pub fn get_volume(playback: bool, channel: &Selem) -> Volume {
         if playback {
             channel
                 .get_playback_volume(SelemChannelId::FrontLeft)
@@ -214,7 +219,7 @@ impl MixerController {
         val == 0
     }
 
-    pub fn set_volume(playback: bool, channel: &Selem, volume: i64) {
+    pub fn set_volume(playback: bool, channel: &Selem, volume: Volume) {
         if playback {
             channel.set_playback_volume_all(volume).unwrap();
         } else {

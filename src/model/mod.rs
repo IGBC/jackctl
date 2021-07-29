@@ -5,9 +5,12 @@ use std::collections::HashMap;
 
 mod card;
 mod port;
+mod event;
 
 pub use card::*;
 pub use port::*;
+
+pub use event::Event;
 
 pub type Model = Rc<RefCell<ModelInner>>;
 
@@ -47,6 +50,27 @@ impl ModelInner {
 
             cards: HashMap::new(),
         }))
+    }
+
+    pub fn update(&mut self, evt: Event) {
+        match evt {
+            Event::XRun => self.increment_xruns(),
+            Event::ResetXruns => self.reset_xruns(),
+            Event::AddCard(id, name) => self.card_detected(id, name),
+            Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
+            Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
+
+            Event::SyncAudioInputs(i) => self.update_audio_inputs(&i),
+            Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
+            
+            Event::SyncMidiInputs(i) => self.update_midi_inputs(&i),
+            Event::SyncMidiOutputs(o) => self.update_midi_outputs(&o),
+
+            Event::SyncConnections(c) => self.update_connections(c),
+
+            _ => eprintln!("Unimplemented event")
+
+        }
     }
 
     pub fn increment_xruns(&mut self) {
