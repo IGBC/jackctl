@@ -2,7 +2,9 @@
 
 # Jack Control Panel
 
-A no fuss solution to wrangling Pro-Audio on Linux:
+__A no fuss solution to wrangling Pro-Audio on Linux__
+
+![Matrix](https://img.shields.io/matrix/jackctl:matrix.org?label=Matrix%20Chat)
 
 ![Audio Matrix Tab Screenshot](/images/Matrix.png)
 
