@@ -3,9 +3,9 @@ with import <nixpkgs> {};
 stdenv.mkDerivation {
   name = "jackctl-dev";
   buildInputs = with pkgs; [
-    rustc cargo rust-analyzer
+    rustc cargo rust-analyzer rustfmt
 
-    pkg-config clang_12
+    pkg-config clang_12 clang12Stdenv
     alsa-lib cairo pango atk
     gtk3 glib gdk-pixbuf libappindicator-gtk3
     jack2
