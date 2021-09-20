@@ -1,3 +1,7 @@
+//! All of the GTK stuff stuffed into a module so that the rest of the program can be designed sanely.
+//! 
+//! Don't expect me to document this module. It will change with every tiny change to the GUI.
+
 use std::cell;
 use std::cell::RefCell;
 use std::env;
@@ -16,7 +20,7 @@ use gtk::{
 use crate::mixer::MixerController;
 
 use crate::jack::JackController;
-use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup};
+use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup, Event};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
@@ -443,7 +447,7 @@ impl MainDialog {
         let signal_id = button.connect_clicked(move |cb| {
             model
                 .borrow_mut()
-                .set_muting(card_id, channel, cb.get_active());
+                .update(Event::SetMuting(card_id, channel, cb.get_active()));
         });
         (button, signal_id)
     }
@@ -468,7 +472,7 @@ impl MainDialog {
         let signal = a.connect_value_changed(move |a| {
             model
                 .borrow_mut()
-                .set_volume(card_id, chan_id, a.get_value() as i64)
+                .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
         });
 
         let s = ScaleBuilder::new()

@@ -37,7 +37,7 @@ impl CardEntry {
     }
 }
 
-static mut jackctl_spawned_server: bool = false;
+static mut MUT_JACKCTL_SPAWNED_SERVER: bool = false;
 
 
 fn panic_kill(info: &panic::PanicInfo) -> ! {
@@ -45,12 +45,13 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
     eprintln!("{}", info);
 
     eprintln!("Killing children (violently)");
-    Command::new("killall").arg("-9").arg("alsa_in").spawn();
-    Command::new("killall").arg("-9").arg("alsa_out").spawn();
+    // We're throwing the results away cos this is a panic handler... what are we gonna do if it fails?!
+    let _ = Command::new("killall").arg("-9").arg("alsa_in").spawn();
+    let _ = Command::new("killall").arg("-9").arg("alsa_out").spawn();
     unsafe {
-        if jackctl_spawned_server {
+        if MUT_JACKCTL_SPAWNED_SERVER {
             eprintln!("Killing Local Server");
-            Command::new("killall").arg("-9").arg("jackd").spawn();
+            let _ = Command::new("killall").arg("-9").arg("jackd").spawn();
         }
     }
 
@@ -80,7 +81,7 @@ impl ProcessManager {
 
             //wait for jack to start,
             unsafe {
-                jackctl_spawned_server = true;
+                MUT_JACKCTL_SPAWNED_SERVER = true;
             }
             thread::sleep(Duration::from_secs(1));
             Some(jack_proc)
@@ -124,7 +125,6 @@ impl ProcessManager {
             }
         }
 
-        let mut junk_list: Vec<i32> = Vec::new();
         for (id, mut card) in self.card_processes.iter_mut() {
             match &mut card.in_proc {
                 Some(proc) => match &mut proc.try_wait() {

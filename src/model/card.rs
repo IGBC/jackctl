@@ -1,5 +1,8 @@
+//! Types used to define a sound card
+
 use std::collections::HashMap;
 
+/// Struct representing a sound card in the model
 #[derive(Debug)]
 pub struct Card {
     pub id: i32,
@@ -10,15 +13,25 @@ pub struct Card {
     pub state: CardStatus,
 }
 
+
+/// Defines all the state a card can be in
 #[derive(Clone, Debug, PartialEq)]
 pub enum CardStatus {
+    /// We just found this card, we don't know anything about it yet
     Unknown,
+    /// this card is in use
     Active,
+    /// This card could not be claimed, we should try again later
     Busy,
+    /// This card could not be enumerated, we are going to leave it alone
     EnumFailed,
+    /// The user has told us not to use this card
     DontUse,
 }
 
+/// Struct representing a mixer channel in the model. 
+/// A mixer channel is a typically a volume slider and a mute switch exposed
+/// as by ALSA. 
 #[derive(Debug, PartialEq)]
 pub struct MixerChannel {
     pub id: u32,

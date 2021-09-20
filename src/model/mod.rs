@@ -1,3 +1,5 @@
+//! Jackctl's Model and Event to drive the applications's MVC patter
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,8 +14,14 @@ pub use port::*;
 
 pub use event::Event;
 
+/// Wrapper around a Mutexed Copy of the Model, 
+/// use this instead of the model directly to
+/// easilly allow changes to the Mutex used.
 pub type Model = Rc<RefCell<ModelInner>>;
 
+/// Central Model of the MVC layout of the application,
+/// you Should only ever make one of these and pass
+/// mutexed references around to it.
 pub struct ModelInner {
     ixruns: u32,
     pub layout_dirty: bool,
@@ -33,6 +41,8 @@ pub struct ModelInner {
 }
 
 impl ModelInner {
+   /// Returns a new model, in default state. Don't assume
+   /// anything is configured or initialised in this constructor.   
     pub fn new() -> Model {
         Rc::new(RefCell::new(ModelInner {
             ixruns: 0,
@@ -73,7 +83,7 @@ impl ModelInner {
         }
     }
 
-    pub fn increment_xruns(&mut self) {
+    fn increment_xruns(&mut self) {
         self.ixruns += 1;
     }
 
@@ -81,7 +91,7 @@ impl ModelInner {
         self.ixruns
     }
 
-    pub fn reset_xruns(&mut self) {
+    fn reset_xruns(&mut self) {
         self.ixruns = 0;
     }
 
@@ -95,7 +105,7 @@ impl ModelInner {
         map
     }
 
-    pub fn update_audio_inputs(&mut self, ports: &Vec<String>) {
+    fn update_audio_inputs(&mut self, ports: &Vec<String>) {
         self.audio_inputs = Self::map_groups(ports, false);
         self.layout_dirty = true;
     }
@@ -104,7 +114,7 @@ impl ModelInner {
         &self.audio_inputs
     }
 
-    pub fn update_audio_outputs(&mut self, ports: &Vec<String>) {
+    fn update_audio_outputs(&mut self, ports: &Vec<String>) {
         self.audio_outputs = Self::map_groups(ports, false);
         self.layout_dirty = true;
     }
@@ -113,7 +123,7 @@ impl ModelInner {
         &self.audio_outputs
     }
 
-    pub fn update_midi_inputs(&mut self, ports: &Vec<String>) {
+    fn update_midi_inputs(&mut self, ports: &Vec<String>) {
         self.midi_inputs = Self::map_groups(ports, true);
         self.layout_dirty = true;
     }
@@ -122,7 +132,7 @@ impl ModelInner {
         &self.midi_inputs
     }
 
-    pub fn update_midi_outputs(&mut self, ports: &Vec<String>) {
+    fn update_midi_outputs(&mut self, ports: &Vec<String>) {
         self.midi_outputs = Self::map_groups(ports, true);
         self.layout_dirty = true;
     }
@@ -139,12 +149,12 @@ impl ModelInner {
         self.audio_outputs.merge(&self.midi_outputs)
     }
 
-    pub fn update_connections(&mut self, connections: Vec<Connection>) {
+    fn update_connections(&mut self, connections: Vec<Connection>) {
         self.connections = connections;
     }
 
     // call when a card is to be added to the system that has not been seen before.
-    pub fn card_detected(&mut self, id: i32, name: String) {
+    fn card_detected(&mut self, id: i32, name: String) {
         println!("Found Unseen Card hw:{} - {}", id, name);
         let card = Card::new(id, name);
         self.cards.insert(id, card);
@@ -166,7 +176,7 @@ impl ModelInner {
         false
     }
 
-    pub fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
+    fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
         let card = self.cards.get_mut(&card_id);
         if card.is_some() {
             let card = card.unwrap();
@@ -179,7 +189,7 @@ impl ModelInner {
         }
     }
 
-    pub fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
+    fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
         let card = self.cards.get_mut(&card_id);
         if card.is_some() {
             let card = card.unwrap();

@@ -1,26 +1,23 @@
 use gtk::prelude::*;
 
 use alsa::card::Iter as CardIter;
-use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
+use alsa::mixer::{Mixer, Selem, SelemChannelId};
 
-use alsa::pcm::{Access, Format, HwParams, State, PCM};
-use alsa::{Direction, ValueOr};
+use alsa::pcm::{HwParams, PCM};
+use alsa::Direction;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::model::{CardStatus, Model};
+use crate::model::{CardStatus, Model, Event};
 
 pub struct MixerController {
     model: Model,
 }
 
-const EXTENDED_SAMPLE_RATES: [u32; 19] = [
+const SAMPLE_RATES: [u32; 19] = [
     8000, 11025, 16000, 22050, 32000, 37800, 44056, 44100, 47250, 48000, 50000, 50400, 64000,
     88200, 96000, 176400, 192000, 352800, 384000,
-];
-const SAMPLE_RATES: [u32; 9] = [
-    8000, 16000, 32000, 44100, 48000, 88200, 96000, 176400, 192000,
 ];
 
 pub type CardId = i32;
@@ -46,9 +43,7 @@ impl MixerController {
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
-                self.model
-                    .borrow_mut()
-                    .card_detected(alsa_card.get_index(), alsa_card.get_name().unwrap());
+                self.model.borrow_mut().update(Event::AddCard(alsa_card.get_index(), alsa_card.get_name().unwrap()));
             }
         }
 
@@ -160,7 +155,7 @@ impl MixerController {
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Playback, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
-        for rate in EXTENDED_SAMPLE_RATES.iter() {
+        for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
                 Ok(()) => results.push(*rate),
                 Err(_) => (),
@@ -175,7 +170,7 @@ impl MixerController {
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Capture, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
-        for rate in EXTENDED_SAMPLE_RATES.iter() {
+        for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
                 Ok(()) => results.push(*rate),
                 Err(_) => (),
@@ -259,8 +254,8 @@ impl MixerController {
 //                 hwp.get_channels_max().unwrap());
 //                 //,         hwp.get_channels().unwrap());
 //                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in EXTENDED_SAMPLE_RATES.iter() {
-//                 for rate in EXTENDED_SAMPLE_RATES.iter() {
+//                 //for rate in SAMPLE_RATES.iter() {
+//                 for rate in SAMPLE_RATES.iter() {
 //                     match hwp.test_rate(*rate) {
 //                         Ok(()) => {
 //                             println!("        {}: Ok", rate);
@@ -284,8 +279,8 @@ impl MixerController {
 //                 hwp.get_channels_max().unwrap());
 //                 //,         hwp.get_channels().unwrap());
 //                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in EXTENDED_SAMPLE_RATES.iter() {
-//                 for rate in EXTENDED_SAMPLE_RATES.iter() {
+//                 //for rate in SAMPLE_RATES.iter() {
+//                 for rate in SAMPLE_RATES.iter() {
 //                     match hwp.test_rate(*rate) {
 //                         Ok(()) => {
 //                             println!("        {}: Ok", rate);
@@ -317,8 +312,8 @@ impl MixerController {
         //             );
         //             //,         hwp.get_channels().unwrap());
         //             hwp.set_rate_resample(true).unwrap();
-        //             //for rate in EXTENDED_SAMPLE_RATES.iter() {
-        //             for rate in EXTENDED_SAMPLE_RATES.iter() {
+        //             //for rate in SAMPLE_RATES.iter() {
+        //             for rate in SAMPLE_RATES.iter() {
         //                 match hwp.test_rate(*rate) {
         //                     Ok(()) => println!("        {}: Ok", rate),
         //                     Err(_) => (),
@@ -342,7 +337,7 @@ impl MixerController {
         //             );
         //             //,         hwp.get_channels().unwrap());
         //             hwp.set_rate_resample(true).unwrap();
-        //             //for rate in EXTENDED_SAMPLE_RATES.iter() {
+        //             //for rate in SAMPLE_RATES.iter() {
         //             for rate in 1..40000000 {
         //                 match hwp.test_rate(rate) {
         //                     Ok(()) => println!("        {}: Ok", rate),

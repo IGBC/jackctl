@@ -1,3 +1,5 @@
+//! Jackctl's connection to the JACK server.
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::thread;
@@ -8,8 +10,9 @@ use gtk::prelude::*;
 use jack::Client as JackClient;
 use jack::PortFlags;
 
-use crate::model::{Connection, Model};
+use crate::model::{Connection, Model, Event};
 
+/// Controller that manages the connection to the JACK server.
 pub struct JackController {
     model: Model,
     interface: JackClient,
@@ -20,6 +23,8 @@ pub struct JackController {
 }
 
 impl JackController {
+    /// Creates new connection to the JACK server.
+    /// This function will loop untill the connection succeeds.
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
         let interface = loop {
             match JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER) {
@@ -51,6 +56,7 @@ impl JackController {
         this
     }
 
+    /// Connect two jack ports together on the server.
     pub fn connect_ports(&self, portid1: usize, portid2: usize, connect: bool) -> bool {
         let model = self.model.borrow();
         let input = model.inputs().get_port_name_by_id(portid2);
@@ -76,6 +82,7 @@ impl JackController {
         }
     }
 
+    /// Interogates the jack server for changes, and submits them to the `jackctl::model::ModelInner`
     pub fn update_model(&mut self) {
         let mut model = self.model.borrow_mut();
         model.cpu_percent = self.interface.cpu_load();
@@ -91,13 +98,13 @@ impl JackController {
 
         //Check audio ports changed
         if ap != self.old_audio_inputs {
-            model.update_audio_inputs(&ap);
+            model.update(Event::SyncAudioInputs(ap.clone()));
             self.old_audio_inputs = ap;
         }
 
         // check midi ports changed
         if mp != self.old_midi_inputs {
-            model.update_midi_inputs(&mp);
+            model.update(Event::SyncMidiInputs(mp.clone()));
             self.old_midi_inputs = mp;
         }
 
@@ -108,13 +115,13 @@ impl JackController {
 
         // Check audio ports changed
         if ap != self.old_audio_outputs {
-            model.update_audio_outputs(&ap);
+            model.update(Event::SyncAudioOutputs(ap.clone()));
             self.old_audio_outputs = ap;
         }
 
         // Check midi ports changed
         if mp != self.old_midi_outputs {
-            model.update_midi_outputs(&mp);
+            model.update(Event::SyncMidiOutputs(mp.clone()));
             self.old_midi_outputs = mp;
         }
 
@@ -138,7 +145,7 @@ impl JackController {
             }
         }
 
-        model.update_connections(connections);
+        model.update(Event::SyncConnections(connections));
     }
 
     fn split_midi_ports(&self, ports: Vec<String>) -> (Vec<String>, Vec<String>) {
