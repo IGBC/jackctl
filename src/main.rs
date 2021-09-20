@@ -1,7 +1,9 @@
+mod error;
 mod jack;
 mod mixer;
 mod model;
 mod process_manager;
+mod settings;
 mod ui;
 
 fn main() {
