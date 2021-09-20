@@ -1,4 +1,4 @@
-//! Jackctl's Model and Event to drive the applications's MVC patter
+//! Jackctl's Model and Event to drive the applications's MVC pattern
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -66,15 +66,26 @@ impl ModelInner {
         match evt {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
+            
             Event::AddCard(id, name) => self.card_detected(id, name),
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
 
             Event::SyncAudioInputs(i) => self.update_audio_inputs(&i),
-            Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
+            Event::AddAudioInput(i) => self.audio_inputs.add(&i),
+            Event::DelAudioInput(i) => self.audio_inputs.remove(&i),
             
+            Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
+            Event::AddAudioOutput(o) => self.audio_outputs.add(&o),
+            Event::DelAudioOutput(o) => self.audio_outputs.remove(&o),
+
             Event::SyncMidiInputs(i) => self.update_midi_inputs(&i),
+            Event::AddMidiInput(i) => self.midi_inputs.add(&i),
+            Event::DelMidiInput(i) => self.midi_inputs.remove(&i),
+
             Event::SyncMidiOutputs(o) => self.update_midi_outputs(&o),
+            Event::AddMidiOutput(o) => self.midi_outputs.add(&o),
+            Event::DelMidiOutput(o) => self.midi_outputs.remove(&o),
 
             Event::SyncConnections(c) => self.update_connections(c),
 

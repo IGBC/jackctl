@@ -1,20 +1,26 @@
+//! Types representing the JACK  connection  graph, sorted by client.
+
+/// Struct wrapping all the groups (clients) in a model for a given port type
 pub struct PortGroup {
     is_midi: bool,
     groups: Vec<Group>,
 }
 
+/// Struct wrapping all the Ports in a group
 #[derive(Clone)]
 pub struct Group {
     name: String,
     ports: Vec<Port>,
 }
 
+/// An individual port in the jack server, mapped to a unique (internal) id.
 #[derive(Clone)]
 pub struct Port {
     portname: String,
     id: usize,
 }
 
+/// A connection between to ports held using the JACK Server native string representation.
 #[derive(Debug)]
 pub struct Connection {
     pub input: String,
@@ -33,9 +39,17 @@ impl Group {
         self.ports.push(port)
     }
 
+    pub fn remove(&mut self, index: usize) {
+        self.ports.remove(index);
+    }
+
     pub fn len(&self) -> usize {
         self.ports.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.ports.is_empty()
+    } 
 
     pub fn name(&self) -> &str {
         &self.name
@@ -102,6 +116,29 @@ impl PortGroup {
         };
 
         g.add(port);
+    }
+
+    pub fn remove(&mut self, name: &str) {
+        let mut parts: Vec<&str> = name.split(':').collect();
+        let group: String = parts.remove(0).to_owned();
+        let portname = parts.join(":");
+
+        match self.groups.iter().position(|r| r.name() == &group) {
+            Some(i) => {
+                let g = &mut self.groups[i];
+                match g.iter().position(|r| r.name() == &portname) {
+                    Some(j) => {
+                        g.remove(j);
+                    },
+                    None => (),
+                }
+
+                if g.is_empty() {
+                    self.groups.remove(i);
+                }
+            },
+            None => (),
+        };
     }
 
     fn add_group(&mut self, group: Group) {
