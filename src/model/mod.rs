@@ -1,7 +1,5 @@
 //! Jackctl's Model and Event to drive the applications's MVC pattern
-
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use std::collections::HashMap;
 
@@ -17,12 +15,12 @@ pub use event::Event;
 /// Wrapper around a Mutexed Copy of the Model, 
 /// use this instead of the model directly to
 /// easilly allow changes to the Mutex used.
-pub type Model = Rc<RefCell<ModelInner>>;
+pub type Model<'a> = Arc<Mutex<ModelInner<'a>>>;
 
 /// Central Model of the MVC layout of the application,
 /// you Should only ever make one of these and pass
 /// mutexed references around to it.
-pub struct ModelInner {
+pub struct ModelInner<'a> {
     ixruns: u32,
     pub layout_dirty: bool,
 
@@ -35,16 +33,16 @@ pub struct ModelInner {
     audio_outputs: PortGroup,
     midi_inputs: PortGroup,
     midi_outputs: PortGroup,
-    connections: Vec<Connection>,
+    connections: Vec<Connection<'a>>,
 
     pub cards: HashMap<i32, Card>,
 }
 
-impl ModelInner {
+impl<'a> ModelInner<'a> {
    /// Returns a new model, in default state. Don't assume
    /// anything is configured or initialised in this constructor.   
-    pub fn new() -> Model {
-        Rc::new(RefCell::new(ModelInner {
+    pub fn new() -> Model<'a> {
+        Arc::new(Mutex::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
             cpu_percent: 0.0,
@@ -62,7 +60,7 @@ impl ModelInner {
         }))
     }
 
-    pub fn update(&mut self, evt: Event) {
+    pub fn update(&mut self, evt: Event<'a>) {
         match evt {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
@@ -72,19 +70,19 @@ impl ModelInner {
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
 
             Event::SyncAudioInputs(i) => self.update_audio_inputs(&i),
-            Event::AddAudioInput(i) => self.audio_inputs.add(&i),
+            Event::AddAudioInput(i) => self.audio_inputs.add(i),
             Event::DelAudioInput(i) => self.audio_inputs.remove(&i),
             
             Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
-            Event::AddAudioOutput(o) => self.audio_outputs.add(&o),
+            Event::AddAudioOutput(o) => self.audio_outputs.add(o),
             Event::DelAudioOutput(o) => self.audio_outputs.remove(&o),
 
             Event::SyncMidiInputs(i) => self.update_midi_inputs(&i),
-            Event::AddMidiInput(i) => self.midi_inputs.add(&i),
+            Event::AddMidiInput(i) => self.midi_inputs.add(i),
             Event::DelMidiInput(i) => self.midi_inputs.remove(&i),
 
             Event::SyncMidiOutputs(o) => self.update_midi_outputs(&o),
-            Event::AddMidiOutput(o) => self.midi_outputs.add(&o),
+            Event::AddMidiOutput(o) => self.midi_outputs.add(o),
             Event::DelMidiOutput(o) => self.midi_outputs.remove(&o),
 
             Event::SyncConnections(c) => self.update_connections(c),
@@ -110,7 +108,7 @@ impl ModelInner {
         let mut map: PortGroup = PortGroup::new(is_midi);
 
         for p in ports.iter() {
-            map.add(p);
+            //map.add(p);
         }
 
         map
@@ -160,7 +158,7 @@ impl ModelInner {
         self.audio_outputs.merge(&self.midi_outputs)
     }
 
-    fn update_connections(&mut self, connections: Vec<Connection>) {
+    fn update_connections(&mut self, connections: Vec<Connection<'a>>) {
         self.connections = connections;
     }
 
@@ -171,12 +169,13 @@ impl ModelInner {
         self.cards.insert(id, card);
     }
 
-    pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
-        let output_name = self.outputs().get_port_name_by_id(id1);
-        let input_name = self.inputs().get_port_name_by_id(id2);
+    pub fn connected_by_id(&self, id1: JackPortType, id2: JackPortType) -> bool {
+        let output_name = self.outputs().get_port_by_id(id1);
+        let input_name = self.inputs().get_port_by_id(id2);
         if output_name.is_none() || input_name.is_none() {
             return false;
         }
+        
         let output_name = output_name.unwrap();
         let input_name = input_name.unwrap();
         for c in self.connections.iter() {

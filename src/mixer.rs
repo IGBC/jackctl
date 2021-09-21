@@ -12,7 +12,7 @@ use std::rc::Rc;
 use crate::model::{CardStatus, Model, Event};
 
 pub struct MixerController {
-    model: Model,
+    model: Model<'static>,
 }
 
 const SAMPLE_RATES: [u32; 19] = [
@@ -26,7 +26,7 @@ pub type Volume = i64;
 pub type SampleRate = u32;
 
 impl MixerController {
-    pub fn new(model: Model) -> Rc<RefCell<Self>> {
+    pub fn new(model: Model<'static>) -> Rc<RefCell<Self>> {
         let this = Rc::new(RefCell::new(Self { model }));
 
         let this_clone = this.clone();

@@ -32,7 +32,7 @@ struct MixerHandle {
 }
 
 pub struct MainDialog {
-    state: Model,
+    state: Model<'static>,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 
@@ -47,8 +47,8 @@ pub struct MainDialog {
     performance_latency: Label,
     tabs: Notebook,
 
-    audio_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
-    midi_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
+    audio_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
+    midi_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
     mixer_handles: Vec<MixerHandle>,
 }
 
@@ -63,7 +63,7 @@ where
 }
 
 pub fn init_ui(
-    state: Model,
+    state: Model<'static>,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 ) -> Rc<RefCell<MainDialog>> {
@@ -109,7 +109,7 @@ pub fn init_ui(
 impl MainDialog {
     pub fn new(
         builder: Builder,
-        state: Model,
+        state: Model<'static>,
         jack_controller: Rc<RefCell<JackController>>,
         alsa_controller: Rc<RefCell<MixerController>>,
     ) -> Rc<RefCell<Self>> {
@@ -191,7 +191,7 @@ impl MainDialog {
         &self,
         inputs: &PortGroup,
         outputs: &PortGroup,
-    ) -> (Grid, Vec<(usize, usize, CheckButton, SignalHandlerId)>) {
+    ) -> (Grid, Vec<(u32, u32, CheckButton, SignalHandlerId)>) {
         let grid = grid();
 
         if inputs.is_empty() || outputs.is_empty() {

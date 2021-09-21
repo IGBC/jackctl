@@ -1,10 +1,10 @@
 //! Event types used for controlling the Model.
 
 use crate::mixer::{CardId, ChannelId, Volume};
-use super::Connection;
+use super::{Connection, Port};
 
 /// Event type represents methods that can be called on the model.
-pub enum Event {
+pub enum Event<'a> {
     /// Called when the JACK Server overruns
     XRun,
     /// Called to reset the overrun count. (For example when the user presses a button)
@@ -16,30 +16,30 @@ pub enum Event {
     /// Called when the user requests a volume change on a channel
     SetVolume(CardId, ChannelId, Volume),
 
-    AddAudioInput(String),
-    DelAudioInput(String),
+    AddAudioInput(Port),
+    DelAudioInput(Port),
     /// Called when the Jack controller wants to overwrite all of the existing connections
     SyncAudioInputs(Vec<String>),
-    AddAudioOutput(String),
-    DelAudioOutput(String),
+    AddAudioOutput(Port),
+    DelAudioOutput(Port),
     /// Called when the Jack controller wants to overwrite all of the existing connections
     SyncAudioOutputs(Vec<String>),
 
-    AddMidiInput(String),
-    DelMidiInput(String),
+    AddMidiInput(Port),
+    DelMidiInput(Port),
     /// Called when the Jack controller wants to overwrite all of the existing connections
     SyncMidiInputs(Vec<String>),
-    AddMidiOutput(String),
-    DelMidiOutput(String),
+    AddMidiOutput(Port),
+    DelMidiOutput(Port),
     /// Called when the Jack controller wants to overwrite all of the existing connections
     SyncMidiOutputs(Vec<String>),
 
     /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncConnections(Vec<Connection>),
+    SyncConnections(Vec<Connection<'a>>),
 
-    AddAudioConnection(Connection),
-    DelAudioConnection(Connection),
+    AddAudioConnection(Connection<'a>),
+    DelAudioConnection(Connection<'a>),
 
-    AddMidiConnection(Connection),
-    DelMidiConnection(Connection),
+    AddMidiConnection(Connection<'a>),
+    DelMidiConnection(Connection<'a>),
 }
