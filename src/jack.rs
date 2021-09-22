@@ -12,7 +12,7 @@ use jack::{PortFlags, NotificationHandler, PortId, AsyncClient, Unowned};
 use jack::Port as JackPort;
 use jack::Error as JackError;
 
-use crate::model::{Connection, Model, Event, JackPortType, Port};
+use crate::model::{Model, Event, JackPortType, Port};
 
 enum PortType {
     Audio,
@@ -27,12 +27,12 @@ enum PortDirection {
 
 
 pub struct JackNotificationController {
-    model: Model<'static>,
+    model: Model,
 }
 
 /// Controller that manages the connection to the JACK server.
 pub struct JackController {
-    model: Model<'static>,
+    model: Model,
     interface: AsyncClient<JackNotificationController, ()>,
     // async_interface: jack::AsyncClient<JackNotificationController, ()>,
 }
@@ -40,7 +40,7 @@ pub struct JackController {
 impl JackController {
     /// Creates new connection to the JACK server.
     /// This function will loop untill the connection succeeds.
-    pub fn new(model: Model<'static>) -> Rc<RefCell<Self>> {
+    pub fn new(model: Model) -> Rc<RefCell<Self>> {
         let client = loop {
             match JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER) {
                 Ok(i) => {
@@ -212,7 +212,13 @@ impl NotificationHandler for JackNotificationController {
         jack::Control::Continue
     }
 
-    fn ports_connected(&mut self, _: &jack::Client, _port_id_a: PortId, _port_id_b: PortId, _are_connected: bool) {
-        eprintln!("EVENT: ports_connected {}, {}, {}", _port_id_a, _port_id_b, _are_connected);
+    fn ports_connected(&mut self, _: &jack::Client, port_id_a: PortId, port_id_b: PortId, are_connected: bool) {
+        eprintln!("EVENT: ports_connected {}, {}, {}", port_id_a, port_id_b, are_connected);
+        let mut model = self.model.lock().unwrap();
+        if are_connected {
+            model.update(Event::AddConnection(port_id_b, port_id_a));
+        } else {
+            model.update(Event::DelConnection(port_id_b, port_id_a));
+        }
     }
 }

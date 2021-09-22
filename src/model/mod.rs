@@ -15,12 +15,12 @@ pub use event::Event;
 /// Wrapper around a Mutexed Copy of the Model, 
 /// use this instead of the model directly to
 /// easilly allow changes to the Mutex used.
-pub type Model<'a> = Arc<Mutex<ModelInner<'a>>>;
+pub type Model = Arc<Mutex<ModelInner>>;
 
 /// Central Model of the MVC layout of the application,
 /// you Should only ever make one of these and pass
 /// mutexed references around to it.
-pub struct ModelInner<'a> {
+pub struct ModelInner {
     ixruns: u32,
     pub layout_dirty: bool,
 
@@ -33,15 +33,15 @@ pub struct ModelInner<'a> {
     audio_outputs: PortGroup,
     midi_inputs: PortGroup,
     midi_outputs: PortGroup,
-    connections: Vec<Connection<'a>>,
+    connections: Vec<Connection>,
 
     pub cards: HashMap<i32, Card>,
 }
 
-impl<'a> ModelInner<'a> {
+impl ModelInner {
    /// Returns a new model, in default state. Don't assume
    /// anything is configured or initialised in this constructor.   
-    pub fn new() -> Model<'a> {
+    pub fn new() -> Model {
         Arc::new(Mutex::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
@@ -60,7 +60,7 @@ impl<'a> ModelInner<'a> {
         }))
     }
 
-    pub fn update(&mut self, evt: Event<'a>) {
+    pub fn update(&mut self, evt: Event) {
         match evt {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
@@ -76,9 +76,8 @@ impl<'a> ModelInner<'a> {
             
             Event::DelPort(id) => self.del_port(id),
 
-            Event::SyncConnections(c) => self.update_connections(c),
-
-            _ => eprintln!("Unimplemented event")
+            Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
+            Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
 
         }
 
@@ -128,8 +127,61 @@ impl<'a> ModelInner<'a> {
         self.audio_outputs.merge(&self.midi_outputs)
     }
 
-    fn update_connections(&mut self, connections: Vec<Connection<'a>>) {
-        self.connections = connections;
+    fn find_port(&self, id: JackPortType) -> Option<&Port> {
+        match self.audio_inputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.audio_outputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.midi_inputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.midi_outputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        None
+    }
+
+    fn add_connection(&mut self, idx: JackPortType, idy: JackPortType) {
+        let input = match self.find_port(idx) {
+            Some(p) => p,
+            None => {
+                eprintln!("ERROR: Attempting to connect from non existant port {}", idx);
+                return 
+            },
+        };
+
+        let output = match self.find_port(idy) {
+            Some(p) => p,
+            None => {
+                eprintln!("ERROR: Attempting to connect to non existant port {} from port \"{}\" ", idy, input.fullname());
+                return 
+            },
+        };
+
+        let new_connection: Connection = Connection{input: idx, output: idy};
+        if self.connections.contains(&new_connection) {
+            eprintln!("ERROR Attempting to connect {} to {} -> already connected", input.fullname(), output.fullname());
+        } else {
+            self.connections.push(new_connection);
+        }
+    }
+
+    fn remove_connection(&mut self, input: JackPortType, output: JackPortType) {
+        let old_connection = Connection{input, output};
+        match self.connections.iter().position(|r| r == &old_connection) {
+            Some(i) => {
+                self.connections.remove(i);
+            },
+            None => {
+                eprintln!("error trying to remove non existing connection between ports {} and {}", input, output);
+            },
+        }
     }
 
     // call when a card is to be added to the system that has not been seen before.
@@ -152,7 +204,7 @@ impl<'a> ModelInner<'a> {
         let output_name = output_name.unwrap();
         let input_name = input_name.unwrap();
         for c in self.connections.iter() {
-            if (c.input == input_name) && (c.output == output_name) {
+            if (c.input == input_name.id()) && (c.output == output_name.id()) {
                 return true;
             }
         }

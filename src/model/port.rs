@@ -24,10 +24,10 @@ pub struct Port {
 }
 
 /// A connection between to ports held using the JACK Server native string representation.
-#[derive(Debug)]
-pub struct Connection<'a> {
-    pub input: &'a Port,
-    pub output: &'a Port,
+#[derive(Debug, PartialEq)]
+pub struct Connection {
+    pub input: JackPortType,
+    pub output: JackPortType,
 }
 
 impl Group {
@@ -86,6 +86,10 @@ impl Port {
 
     pub fn id(&self) -> JackPortType {
         self.id
+    }
+
+    pub fn fullname(&self) -> String {
+        format!("{}:{}", self.groupname, self.portname)
     }
 }
 

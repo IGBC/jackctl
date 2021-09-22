@@ -31,7 +31,7 @@ struct MixerHandle {
 }
 
 pub struct MainDialog {
-    state: Model<'static>,
+    state: Model,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 
@@ -62,7 +62,7 @@ where
 }
 
 pub fn init_ui(
-    state: Model<'static>,
+    state: Model,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 ) -> Rc<RefCell<MainDialog>> {
@@ -108,7 +108,7 @@ pub fn init_ui(
 impl MainDialog {
     pub fn new(
         builder: Builder,
-        state: Model<'static>,
+        state: Model,
         jack_controller: Rc<RefCell<JackController>>,
         alsa_controller: Rc<RefCell<MixerController>>,
     ) -> Rc<RefCell<Self>> {

@@ -1,10 +1,10 @@
 //! Event types used for controlling the Model.
 
 use crate::mixer::{CardId, ChannelId, Volume};
-use super::{Connection, Port, JackPortType};
+use super::{Port, JackPortType};
 
 /// Event type represents methods that can be called on the model.
-pub enum Event<'a> {
+pub enum Event {
     /// Called when the JACK Server overruns
     XRun,
     /// Called to reset the overrun count. (For example when the user presses a button)
@@ -24,12 +24,7 @@ pub enum Event<'a> {
     // Called when its time to delete a port,
     // 'Argument is port ID 
     DelPort(JackPortType),
-    /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncConnections(Vec<Connection<'a>>),
-
-    AddAudioConnection(Connection<'a>),
-    DelAudioConnection(Connection<'a>),
-
-    AddMidiConnection(Connection<'a>),
-    DelMidiConnection(Connection<'a>),
+    
+    AddConnection(JackPortType, JackPortType),
+    DelConnection(JackPortType, JackPortType),
 }

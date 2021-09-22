@@ -24,7 +24,7 @@ pub struct ProcessManager {
     jack_process: Option<Child>,
     card_processes: HashMap<i32, CardEntry>, // ID, card
 
-    model: Model<'static>,
+    model: Model,
 }
 
 impl CardEntry {
@@ -60,7 +60,7 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
 
 
 impl ProcessManager {
-    pub fn new(model: Model<'static>) -> Rc<RefCell<Self>> {
+    pub fn new(model: Model) -> Rc<RefCell<Self>> {
         
         panic::set_hook(Box::new(|pi| {
             panic_kill(pi);
