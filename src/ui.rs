@@ -9,6 +9,8 @@ use std::rc::Rc;
 
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
+use gio::prelude::*;
+
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
@@ -22,6 +24,9 @@ use crate::jack::JackController;
 use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup, Event};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
+
+const STYLE: &str = include_str!("jackctl.css");
+const GLADEFILE: &str = include_str!("jackctl.glade");
 
 struct MixerHandle {
     card_id: i32,
@@ -65,21 +70,30 @@ pub fn init_ui(
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
-) -> Rc<RefCell<MainDialog>> {
+) -> (Rc<RefCell<MainDialog>>, Application) {
     // define the gtk application with a unique name and default parameters
-    let _application = Application::new(Some("jackctl.segfault"), Default::default())
+    let application = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Initialization failed");
 
-    // this registers a closure (executing our setup_gui function)
-    //that has to be run on a `activate` event, triggered when the UI is loaded
-    //application.connect_activate(move |app| {
-    //
-    let glade_src = include_str!("jackctl.glade");
+    let this = MainDialog::new(state, jack_controller, alsa_controller);
+    let win_clone = this.clone();
 
-    // this builder provides access to all components of the defined ui
-    let builder = Builder::from_string(glade_src);
+    application.connect_startup(move |app| {
+        // The CSS "magic" happens here.
+        let provider = gtk::CssProvider::new();
+        provider
+            .load_from_data(STYLE.as_bytes())
+            .expect("Failed to load CSS");
+        // We give the CssProvided to the default screen so the CSS rules we added
+        // can be applied to our window.
+        gtk::StyleContext::add_provider_for_screen(
+            &gdk::Screen::get_default().expect("Error initializing gtk css provider."),
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
-    let this = MainDialog::new(builder, state, jack_controller, alsa_controller);
+        win_clone.borrow_mut().build_ui(&app);
+    });
 
     let win_clone = this.clone();
 
@@ -102,16 +116,18 @@ pub fn init_ui(
     indicator.set_menu(&mut m);
     m.show_all();
 
-    this
+    (this, application)
 }
 
 impl MainDialog {
     pub fn new(
-        builder: Builder,
         state: Model,
         jack_controller: Rc<RefCell<JackController>>,
         alsa_controller: Rc<RefCell<MixerController>>,
     ) -> Rc<RefCell<Self>> {
+        // this builder provides access to all components of the defined ui
+        let builder = Builder::from_string(GLADEFILE);
+
         // Initialise the state:
 
         // find the main dialog
@@ -182,6 +198,11 @@ impl MainDialog {
         window.connect_draw(move |_, _| this_clone.borrow_mut().update_ui());
 
         this
+    }
+
+    pub fn build_ui(&mut self, app: &Application) {
+        eprintln!("Setting Window Application");
+        self.window.set_application(Some(app));
     }
 
     pub fn show(&self) {

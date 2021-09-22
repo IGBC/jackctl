@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 gtk = { version = "0.9.2", features = ["v3_24"] }
 gio = {version = "0.9.1", features = ["v2_56"] }
+gdk = "^0.13.2"
 glib = "*"
 libappindicator = "0.5"
 

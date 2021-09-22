@@ -6,6 +6,9 @@ mod process_manager;
 mod settings;
 mod ui;
 
+use gio::prelude::*;
+use std::env::args;
+
 fn main() {
     {
         if gtk::init().is_err() {
@@ -20,13 +23,14 @@ fn main() {
         let proc_manager = process_manager::ProcessManager::new(model.clone());
         let jack_controller = jack::JackController::new(model.clone());
         let alsa_controller = mixer::MixerController::new(model.clone());
-        let window = ui::init_ui(
+        let (window, app) = ui::init_ui(
             model.clone(),
             jack_controller.clone(),
             alsa_controller.clone(),
         );
         window.borrow().show();
-        gtk::main();
+
+        app.run(&args().collect::<Vec<_>>());
         proc_manager.borrow_mut().end();
     }
 
