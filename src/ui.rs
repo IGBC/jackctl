@@ -2,7 +2,6 @@
 //! 
 //! Don't expect me to document this module. It will change with every tiny change to the GUI.
 
-use std::cell;
 use std::cell::RefCell;
 use std::env;
 use std::path::Path;
@@ -274,7 +273,7 @@ impl MainDialog {
         }
     }
 
-    fn update_mixer(&self, model: &cell::RefMut<ModelInner>) -> (Grid, Vec<MixerHandle>) {
+    fn update_mixer(&self, model: &ModelInner) -> (Grid, Vec<MixerHandle>) {
         let grid = grid();
         let mut handles = Vec::new();
         grid.set_hexpand(true);
@@ -339,7 +338,7 @@ impl MainDialog {
     }
 
     pub fn update_ui(&mut self) -> gtk::Inhibit {
-        let mut model = self.state.borrow_mut();
+        let mut model = self.state.lock().unwrap();
         self.xruns_label
             .set_markup(&format!("{} XRuns", model.xruns()));
         if model.xruns() == 0 {
@@ -446,7 +445,7 @@ impl MainDialog {
 
         let signal_id = button.connect_clicked(move |cb| {
             model
-                .borrow_mut()
+                .lock().unwrap()
                 .update(Event::SetMuting(card_id, channel, cb.get_active()));
         });
         (button, signal_id)
@@ -471,7 +470,7 @@ impl MainDialog {
 
         let signal = a.connect_value_changed(move |a| {
             model
-                .borrow_mut()
+                .lock().unwrap()
                 .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
         });
 

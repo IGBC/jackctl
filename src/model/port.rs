@@ -5,7 +5,6 @@ pub type JackPortType = u32;
 
 /// Struct wrapping all the groups (clients) in a model for a given port type
 pub struct PortGroup {
-    is_midi: bool,
     groups: Vec<Group>,
 }
 
@@ -65,7 +64,11 @@ impl Group {
 }
 
 impl Port {
-    pub fn new(id: JackPortType, portname: String, groupname: String) -> Self {
+    pub fn new(id: JackPortType, name: String) -> Self {
+        let mut parts: Vec<&str> = name.split(':').collect();
+        let groupname: String = parts.remove(0).to_owned();
+        let portname = parts.join(":");
+     
         Port {
             id,
             portname,
@@ -87,15 +90,14 @@ impl Port {
 }
 
 impl PortGroup {
-    pub fn new(is_midi: bool) -> Self {
+    pub fn new() -> Self {
         PortGroup {
-            is_midi,
             groups: Vec::new(),
         }
     }
 
     pub fn merge(&self, rhs: &Self) -> Self {
-        let mut pg = Self::new(false);
+        let mut pg = Self::new();
         for i in self.iter() {
             pg.add_group(i.clone());
         }
@@ -120,23 +122,22 @@ impl PortGroup {
         g.add(port);
     }
 
-    pub fn remove(&mut self, port: &Port) {
-        match self.groups.iter().position(|r| r.name() == port.group()) {
-            Some(i) => {
-                let g = &mut self.groups[i];
-                match g.iter().position(|r| r.name() == port.name()) {
-                    Some(j) => {
-                        g.remove(j);
-                    },
-                    None => (),
-                }
+    pub fn remove_port_by_id(&mut self, id: JackPortType) -> bool {
+        for (i, g) in self.groups.iter_mut().enumerate() {
+            match g.iter().position(|r| r.id() == id) {
+                Some(j) => {
+                    g.remove(j);
+                    if g.is_empty() {
+                        self.groups.remove(i);
+                    }
+        
+                    return true;
+                },
+                None => (),
+            }
+        }
 
-                if g.is_empty() {
-                    self.groups.remove(i);
-                }
-            },
-            None => (),
-        };
+        return false;
     }
 
     fn add_group(&mut self, group: Group) {

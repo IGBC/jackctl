@@ -50,10 +50,10 @@ impl<'a> ModelInner<'a> {
             buffer_size: 0,
             latency: 0,
 
-            audio_inputs: PortGroup::new(false),
-            audio_outputs: PortGroup::new(false),
-            midi_inputs: PortGroup::new(true),
-            midi_outputs: PortGroup::new(true),
+            audio_inputs: PortGroup::new(),
+            audio_outputs: PortGroup::new(),
+            midi_inputs: PortGroup::new(),
+            midi_outputs: PortGroup::new(),
             connections: Vec::new(),
 
             cards: HashMap::new(),
@@ -68,28 +68,21 @@ impl<'a> ModelInner<'a> {
             Event::AddCard(id, name) => self.card_detected(id, name),
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
-
-            Event::SyncAudioInputs(i) => self.update_audio_inputs(&i),
-            Event::AddAudioInput(i) => self.audio_inputs.add(i),
-            Event::DelAudioInput(i) => self.audio_inputs.remove(&i),
             
-            Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
+            Event::AddAudioInput(i) => self.audio_inputs.add(i),
             Event::AddAudioOutput(o) => self.audio_outputs.add(o),
-            Event::DelAudioOutput(o) => self.audio_outputs.remove(&o),
-
-            Event::SyncMidiInputs(i) => self.update_midi_inputs(&i),
             Event::AddMidiInput(i) => self.midi_inputs.add(i),
-            Event::DelMidiInput(i) => self.midi_inputs.remove(&i),
-
-            Event::SyncMidiOutputs(o) => self.update_midi_outputs(&o),
             Event::AddMidiOutput(o) => self.midi_outputs.add(o),
-            Event::DelMidiOutput(o) => self.midi_outputs.remove(&o),
+            
+            Event::DelPort(id) => self.del_port(id),
 
             Event::SyncConnections(c) => self.update_connections(c),
 
             _ => eprintln!("Unimplemented event")
 
         }
+
+        self.layout_dirty = true;
     }
 
     fn increment_xruns(&mut self) {
@@ -104,46 +97,23 @@ impl<'a> ModelInner<'a> {
         self.ixruns = 0;
     }
 
-    fn map_groups(ports: &Vec<String>, is_midi: bool) -> PortGroup {
-        let mut map: PortGroup = PortGroup::new(is_midi);
-
-        for p in ports.iter() {
-            //map.add(p);
-        }
-
-        map
-    }
-
-    fn update_audio_inputs(&mut self, ports: &Vec<String>) {
-        self.audio_inputs = Self::map_groups(ports, false);
-        self.layout_dirty = true;
+    fn del_port(&mut self, id: JackPortType) {
+        if self.audio_inputs.remove_port_by_id(id) { return };
+        if self.audio_outputs.remove_port_by_id(id) { return };
+        if self.midi_inputs.remove_port_by_id(id) { return };
+        if self.midi_outputs.remove_port_by_id(id) { return };
     }
 
     pub fn audio_inputs(&self) -> &PortGroup {
         &self.audio_inputs
     }
 
-    fn update_audio_outputs(&mut self, ports: &Vec<String>) {
-        self.audio_outputs = Self::map_groups(ports, false);
-        self.layout_dirty = true;
-    }
-
     pub fn audio_outputs(&self) -> &PortGroup {
         &self.audio_outputs
     }
 
-    fn update_midi_inputs(&mut self, ports: &Vec<String>) {
-        self.midi_inputs = Self::map_groups(ports, true);
-        self.layout_dirty = true;
-    }
-
     pub fn midi_inputs(&self) -> &PortGroup {
         &self.midi_inputs
-    }
-
-    fn update_midi_outputs(&mut self, ports: &Vec<String>) {
-        self.midi_outputs = Self::map_groups(ports, true);
-        self.layout_dirty = true;
     }
 
     pub fn midi_outputs(&self) -> &PortGroup {
@@ -169,9 +139,12 @@ impl<'a> ModelInner<'a> {
         self.cards.insert(id, card);
     }
 
+    // TODO: make this work with just ID's
     pub fn connected_by_id(&self, id1: JackPortType, id2: JackPortType) -> bool {
-        let output_name = self.outputs().get_port_by_id(id1);
-        let input_name = self.inputs().get_port_by_id(id2);
+        let outputs = self.outputs();
+        let inputs = self.inputs();
+        let output_name = outputs.get_port_by_id(id1);
+        let input_name = inputs.get_port_by_id(id2);
         if output_name.is_none() || input_name.is_none() {
             return false;
         }

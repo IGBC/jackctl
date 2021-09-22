@@ -1,7 +1,7 @@
 //! Event types used for controlling the Model.
 
 use crate::mixer::{CardId, ChannelId, Volume};
-use super::{Connection, Port};
+use super::{Connection, Port, JackPortType};
 
 /// Event type represents methods that can be called on the model.
 pub enum Event<'a> {
@@ -17,23 +17,13 @@ pub enum Event<'a> {
     SetVolume(CardId, ChannelId, Volume),
 
     AddAudioInput(Port),
-    DelAudioInput(Port),
-    /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncAudioInputs(Vec<String>),
     AddAudioOutput(Port),
-    DelAudioOutput(Port),
-    /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncAudioOutputs(Vec<String>),
-
     AddMidiInput(Port),
-    DelMidiInput(Port),
-    /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncMidiInputs(Vec<String>),
     AddMidiOutput(Port),
-    DelMidiOutput(Port),
-    /// Called when the Jack controller wants to overwrite all of the existing connections
-    SyncMidiOutputs(Vec<String>),
 
+    // Called when its time to delete a port,
+    // 'Argument is port ID 
+    DelPort(JackPortType),
     /// Called when the Jack controller wants to overwrite all of the existing connections
     SyncConnections(Vec<Connection<'a>>),
 

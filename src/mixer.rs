@@ -39,15 +39,15 @@ impl MixerController {
     }
 
     fn update(&mut self) {
-        let card_ids: Vec<CardId> = self.model.borrow().cards.keys().map(|x| *x).collect();
+        let card_ids: Vec<CardId> = self.model.lock().unwrap().cards.keys().map(|x| *x).collect();
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
-                self.model.borrow_mut().update(Event::AddCard(alsa_card.get_index(), alsa_card.get_name().unwrap()));
+                self.model.lock().unwrap().update(Event::AddCard(alsa_card.get_index(), alsa_card.get_name().unwrap()));
             }
         }
 
-        for card in self.model.borrow_mut().cards.values_mut() {
+        for card in self.model.lock().unwrap().cards.values_mut() {
             // todo map this into a proper match statement
             match card.state {
                 CardStatus::Unknown => {

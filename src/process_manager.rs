@@ -105,7 +105,7 @@ impl ProcessManager {
 
     fn update_processes(&mut self) {
         let model = self.model.clone();
-        for card in model.borrow().cards.values() {
+        for card in model.lock().unwrap().cards.values() {
             match card.state {
                 CardStatus::Active => {
                     if !self.card_processes.contains_key(&card.id) {
