@@ -213,7 +213,9 @@ impl MainDialog {
             let mut curr_x = 2;
             for (i, g) in inputs.iter().enumerate() {
                 let l = grid_label(g.name(), true);
-                l.set_line_wrap(true);
+                // Don't re-enable this, it causes a spacing bug
+                // TODO: Manual Word Wrapping.
+                //l.set_line_wrap(true);
                 grid.attach(&l, curr_x, 0, g.len() as i32, 1);
 
                 for n in g.iter() {
@@ -502,6 +504,8 @@ fn grid_label(text: &str, vertical: bool) -> Label {
         l.set_valign(Align::End);
     } else {
         l.set_halign(Align::End);
+        l.set_justify(gtk::Justification::Right);
+        l.set_xalign(1.0);
     }
     l
 }
