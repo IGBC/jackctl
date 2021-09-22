@@ -209,6 +209,7 @@ impl NotificationHandler for JackNotificationController {
 
     fn port_rename(&mut self, _: &jack::Client, _port_id: PortId, _old_name: &str, _new_name: &str) -> jack::Control {
         eprintln!("EVENT: port_rename {}, {}, {}", _port_id, _old_name, _new_name);
+        eprintln!("Error: port renaming unimplemented");
         jack::Control::Continue
     }
 
@@ -220,5 +221,12 @@ impl NotificationHandler for JackNotificationController {
         } else {
             model.update(Event::DelConnection(port_id_b, port_id_a));
         }
+    }
+
+    fn xrun(&mut self, _: &jack::Client) -> jack::Control {
+        eprintln!("EVENT: XRun");
+        let mut model = self.model.lock().unwrap();
+        model.update(Event::XRun);
+        jack::Control::Continue
     }
 }

@@ -12,7 +12,7 @@ use gtk::prelude::*;
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
-    Adjustment, Align, Button, CheckButton, Grid, Image, Label, LevelBar, Notebook, Orientation,
+    Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook, Orientation,
     PositionType, Scale, ScaleBuilder, Separator, Window,
 };
 
@@ -38,7 +38,7 @@ pub struct MainDialog {
     //builder: Builder,
     window: Window,
     xruns_label: Label,
-    xruns_icon: Image,
+    xruns_icon: Button,
     cpu_label: Label,
     cpu_meter: LevelBar,
     performance_rate: Label,
@@ -125,9 +125,12 @@ impl MainDialog {
         // Setup xruns display
         let xruns_label: Label = get_object(&builder, "label.xruns.maindialog");
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
-        let xruns_icon: Image = get_object(&builder, "icon.xruns.maindialog");
-        xruns_icon.set_from_icon_name(Some("dialog-warning-symbolic"), gtk::IconSize::Button);
-        //xruns_icon.connect_clicked(move |icon| { state.borrow().reset_xruns(); icon.hide();})
+        let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
+        let state_clone = state.clone();
+        xruns_icon.connect_clicked(move |icon| { 
+            state_clone.lock().unwrap().update(Event::ResetXruns);
+            icon.hide();
+        });
 
         // Setup CPU Meter
         let cpu_label: Label = get_object(&builder, "label.cpu.maindialog");
