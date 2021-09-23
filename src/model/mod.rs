@@ -1,5 +1,5 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+//! Jackctl's Model and Event to drive the applications's MVC pattern
+use std::sync::{Arc, Mutex};
 
 use std::collections::HashMap;
 
@@ -12,8 +12,14 @@ pub use port::*;
 
 pub use event::Event;
 
-pub type Model = Rc<RefCell<ModelInner>>;
+/// Wrapper around a Mutexed Copy of the Model, 
+/// use this instead of the model directly to
+/// easilly allow changes to the Mutex used.
+pub type Model = Arc<Mutex<ModelInner>>;
 
+/// Central Model of the MVC layout of the application,
+/// you Should only ever make one of these and pass
+/// mutexed references around to it.
 pub struct ModelInner {
     ixruns: u32,
     pub layout_dirty: bool,
@@ -33,8 +39,10 @@ pub struct ModelInner {
 }
 
 impl ModelInner {
+   /// Returns a new model, in default state. Don't assume
+   /// anything is configured or initialised in this constructor.   
     pub fn new() -> Model {
-        Rc::new(RefCell::new(ModelInner {
+        Arc::new(Mutex::new(ModelInner {
             ixruns: 0,
             layout_dirty: true,
             cpu_percent: 0.0,
@@ -42,10 +50,10 @@ impl ModelInner {
             buffer_size: 0,
             latency: 0,
 
-            audio_inputs: PortGroup::new(false),
-            audio_outputs: PortGroup::new(false),
-            midi_inputs: PortGroup::new(true),
-            midi_outputs: PortGroup::new(true),
+            audio_inputs: PortGroup::new(),
+            audio_outputs: PortGroup::new(),
+            midi_inputs: PortGroup::new(),
+            midi_outputs: PortGroup::new(),
             connections: Vec::new(),
 
             cards: HashMap::new(),
@@ -56,24 +64,27 @@ impl ModelInner {
         match evt {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
+            
             Event::AddCard(id, name) => self.card_detected(id, name),
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
-
-            Event::SyncAudioInputs(i) => self.update_audio_inputs(&i),
-            Event::SyncAudioOutputs(o) => self.update_audio_outputs(&o),
             
-            Event::SyncMidiInputs(i) => self.update_midi_inputs(&i),
-            Event::SyncMidiOutputs(o) => self.update_midi_outputs(&o),
+            Event::AddAudioInput(i) => self.audio_inputs.add(i),
+            Event::AddAudioOutput(o) => self.audio_outputs.add(o),
+            Event::AddMidiInput(i) => self.midi_inputs.add(i),
+            Event::AddMidiOutput(o) => self.midi_outputs.add(o),
+            
+            Event::DelPort(id) => self.del_port(id),
 
-            Event::SyncConnections(c) => self.update_connections(c),
-
-            _ => eprintln!("Unimplemented event")
+            Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
+            Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
 
         }
+
+        self.layout_dirty = true;
     }
 
-    pub fn increment_xruns(&mut self) {
+    fn increment_xruns(&mut self) {
         self.ixruns += 1;
     }
 
@@ -81,50 +92,27 @@ impl ModelInner {
         self.ixruns
     }
 
-    pub fn reset_xruns(&mut self) {
+    fn reset_xruns(&mut self) {
         self.ixruns = 0;
     }
 
-    fn map_groups(ports: &Vec<String>, is_midi: bool) -> PortGroup {
-        let mut map: PortGroup = PortGroup::new(is_midi);
-
-        for p in ports.iter() {
-            map.add(p);
-        }
-
-        map
-    }
-
-    pub fn update_audio_inputs(&mut self, ports: &Vec<String>) {
-        self.audio_inputs = Self::map_groups(ports, false);
-        self.layout_dirty = true;
+    fn del_port(&mut self, id: JackPortType) {
+        if self.audio_inputs.remove_port_by_id(id) { return };
+        if self.audio_outputs.remove_port_by_id(id) { return };
+        if self.midi_inputs.remove_port_by_id(id) { return };
+        if self.midi_outputs.remove_port_by_id(id) { return };
     }
 
     pub fn audio_inputs(&self) -> &PortGroup {
         &self.audio_inputs
     }
 
-    pub fn update_audio_outputs(&mut self, ports: &Vec<String>) {
-        self.audio_outputs = Self::map_groups(ports, false);
-        self.layout_dirty = true;
-    }
-
     pub fn audio_outputs(&self) -> &PortGroup {
         &self.audio_outputs
     }
 
-    pub fn update_midi_inputs(&mut self, ports: &Vec<String>) {
-        self.midi_inputs = Self::map_groups(ports, true);
-        self.layout_dirty = true;
-    }
-
     pub fn midi_inputs(&self) -> &PortGroup {
         &self.midi_inputs
-    }
-
-    pub fn update_midi_outputs(&mut self, ports: &Vec<String>) {
-        self.midi_outputs = Self::map_groups(ports, true);
-        self.layout_dirty = true;
     }
 
     pub fn midi_outputs(&self) -> &PortGroup {
@@ -139,34 +127,91 @@ impl ModelInner {
         self.audio_outputs.merge(&self.midi_outputs)
     }
 
-    pub fn update_connections(&mut self, connections: Vec<Connection>) {
-        self.connections = connections;
+    fn find_port(&self, id: JackPortType) -> Option<&Port> {
+        match self.audio_inputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.audio_outputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.midi_inputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        match self.midi_outputs.get_port_by_id(id) {
+            Some(port) => return Some(port),
+            None => (),
+        }
+        None
+    }
+
+    fn add_connection(&mut self, idx: JackPortType, idy: JackPortType) {
+        let input = match self.find_port(idx) {
+            Some(p) => p,
+            None => {
+                eprintln!("ERROR: Attempting to connect from non existant port {}", idx);
+                return 
+            },
+        };
+
+        let output = match self.find_port(idy) {
+            Some(p) => p,
+            None => {
+                eprintln!("ERROR: Attempting to connect to non existant port {} from port \"{}\" ", idy, input.fullname());
+                return 
+            },
+        };
+
+        let new_connection: Connection = Connection{input: idx, output: idy};
+        if self.connections.contains(&new_connection) {
+            eprintln!("ERROR Attempting to connect {} to {} -> already connected", input.fullname(), output.fullname());
+        } else {
+            self.connections.push(new_connection);
+        }
+    }
+
+    fn remove_connection(&mut self, input: JackPortType, output: JackPortType) {
+        let old_connection = Connection{input, output};
+        match self.connections.iter().position(|r| r == &old_connection) {
+            Some(i) => {
+                self.connections.remove(i);
+            },
+            None => {
+                eprintln!("error trying to remove non existing connection between ports {} and {}", input, output);
+            },
+        }
     }
 
     // call when a card is to be added to the system that has not been seen before.
-    pub fn card_detected(&mut self, id: i32, name: String) {
+    fn card_detected(&mut self, id: i32, name: String) {
         println!("Found Unseen Card hw:{} - {}", id, name);
         let card = Card::new(id, name);
         self.cards.insert(id, card);
     }
 
-    pub fn connected_by_id(&self, id1: usize, id2: usize) -> bool {
-        let output_name = self.outputs().get_port_name_by_id(id1);
-        let input_name = self.inputs().get_port_name_by_id(id2);
+    // TODO: make this work with just ID's
+    pub fn connected_by_id(&self, id1: JackPortType, id2: JackPortType) -> bool {
+        let outputs = self.outputs();
+        let inputs = self.inputs();
+        let output_name = outputs.get_port_by_id(id1);
+        let input_name = inputs.get_port_by_id(id2);
         if output_name.is_none() || input_name.is_none() {
             return false;
         }
+        
         let output_name = output_name.unwrap();
         let input_name = input_name.unwrap();
         for c in self.connections.iter() {
-            if (c.input == input_name) && (c.output == output_name) {
+            if (c.input == input_name.id()) && (c.output == output_name.id()) {
                 return true;
             }
         }
         false
     }
 
-    pub fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
+    fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
         let card = self.cards.get_mut(&card_id);
         if card.is_some() {
             let card = card.unwrap();
@@ -179,7 +224,7 @@ impl ModelInner {
         }
     }
 
-    pub fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
+    fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
         let card = self.cards.get_mut(&card_id);
         if card.is_some() {
             let card = card.unwrap();

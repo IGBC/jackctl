@@ -1,4 +1,7 @@
-use std::cell;
+//! All of the GTK stuff stuffed into a module so that the rest of the program can be designed sanely.
+//! 
+//! Don't expect me to document this module. It will change with every tiny change to the GUI.
+
 use std::cell::RefCell;
 use std::env;
 use std::path::Path;
@@ -9,14 +12,14 @@ use gtk::prelude::*;
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
-    Adjustment, Align, Button, CheckButton, Grid, Image, Label, LevelBar, Notebook, Orientation,
+    Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook, Orientation,
     PositionType, Scale, ScaleBuilder, Separator, Window,
 };
 
 use crate::mixer::MixerController;
 
 use crate::jack::JackController;
-use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup};
+use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup, Event};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
@@ -35,7 +38,7 @@ pub struct MainDialog {
     //builder: Builder,
     window: Window,
     xruns_label: Label,
-    xruns_icon: Image,
+    xruns_icon: Button,
     cpu_label: Label,
     cpu_meter: LevelBar,
     performance_rate: Label,
@@ -43,8 +46,8 @@ pub struct MainDialog {
     performance_latency: Label,
     tabs: Notebook,
 
-    audio_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
-    midi_matrix: Vec<(usize, usize, CheckButton, SignalHandlerId)>,
+    audio_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
+    midi_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
     mixer_handles: Vec<MixerHandle>,
 }
 
@@ -122,9 +125,12 @@ impl MainDialog {
         // Setup xruns display
         let xruns_label: Label = get_object(&builder, "label.xruns.maindialog");
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
-        let xruns_icon: Image = get_object(&builder, "icon.xruns.maindialog");
-        xruns_icon.set_from_icon_name(Some("dialog-warning-symbolic"), gtk::IconSize::Button);
-        //xruns_icon.connect_clicked(move |icon| { state.borrow().reset_xruns(); icon.hide();})
+        let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
+        let state_clone = state.clone();
+        xruns_icon.connect_clicked(move |icon| { 
+            state_clone.lock().unwrap().update(Event::ResetXruns);
+            icon.hide();
+        });
 
         // Setup CPU Meter
         let cpu_label: Label = get_object(&builder, "label.cpu.maindialog");
@@ -187,7 +193,7 @@ impl MainDialog {
         &self,
         inputs: &PortGroup,
         outputs: &PortGroup,
-    ) -> (Grid, Vec<(usize, usize, CheckButton, SignalHandlerId)>) {
+    ) -> (Grid, Vec<(u32, u32, CheckButton, SignalHandlerId)>) {
         let grid = grid();
 
         if inputs.is_empty() || outputs.is_empty() {
@@ -270,7 +276,7 @@ impl MainDialog {
         }
     }
 
-    fn update_mixer(&self, model: &cell::RefMut<ModelInner>) -> (Grid, Vec<MixerHandle>) {
+    fn update_mixer(&self, model: &ModelInner) -> (Grid, Vec<MixerHandle>) {
         let grid = grid();
         let mut handles = Vec::new();
         grid.set_hexpand(true);
@@ -335,7 +341,7 @@ impl MainDialog {
     }
 
     pub fn update_ui(&mut self) -> gtk::Inhibit {
-        let mut model = self.state.borrow_mut();
+        let mut model = self.state.lock().unwrap();
         self.xruns_label
             .set_markup(&format!("{} XRuns", model.xruns()));
         if model.xruns() == 0 {
@@ -442,8 +448,8 @@ impl MainDialog {
 
         let signal_id = button.connect_clicked(move |cb| {
             model
-                .borrow_mut()
-                .set_muting(card_id, channel, cb.get_active());
+                .lock().unwrap()
+                .update(Event::SetMuting(card_id, channel, cb.get_active()));
         });
         (button, signal_id)
     }
@@ -467,8 +473,8 @@ impl MainDialog {
 
         let signal = a.connect_value_changed(move |a| {
             model
-                .borrow_mut()
-                .set_volume(card_id, chan_id, a.get_value() as i64)
+                .lock().unwrap()
+                .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
         });
 
         let s = ScaleBuilder::new()

@@ -778,12 +778,15 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
             </child>
             <child type="action-end">
               <object class="GtkBox">
+                <property name="height-request">33</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
                   <object class="GtkLabel" id="label.xruns.maindialog">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
+                    <property name="margin-end">3</property>
+                    <property name="margin-bottom">3</property>
                     <property name="xpad">5</property>
                     <property name="label" translatable="yes">12 XRuns</property>
                   </object>
@@ -794,14 +797,21 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkImage" id="icon.xruns.maindialog">
+                  <object class="GtkButton" id="button.xruns.maindialog">
                     <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="tooltip-text" translatable="yes">Reset Counter</property>
-                    <property name="halign">center</property>
-                    <property name="valign">center</property>
-                    <property name="stock">gtk-no</property>
-                    <property name="icon_size">2</property>
+                    <property name="can-focus">True</property>
+                    <property name="focus-on-click">False</property>
+                    <property name="receives-default">True</property>
+                    <property name="margin-end">8</property>
+                    <property name="margin-bottom">5</property>
+                    <property name="relief">half</property>
+                    <child>
+                      <object class="GtkImage">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="icon-name">dialog-warning-symbolic</property>
+                      </object>
+                    </child>
                   </object>
                   <packing>
                     <property name="expand">False</property>

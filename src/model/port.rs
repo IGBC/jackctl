@@ -1,24 +1,33 @@
+//! Types representing the JACK  connection  graph, sorted by client.
+use std::cmp::PartialEq;
+
+pub type JackPortType = u32;
+
+/// Struct wrapping all the groups (clients) in a model for a given port type
 pub struct PortGroup {
-    is_midi: bool,
     groups: Vec<Group>,
 }
 
+/// Struct wrapping all the Ports in a group
 #[derive(Clone)]
 pub struct Group {
     name: String,
     ports: Vec<Port>,
 }
 
-#[derive(Clone)]
+/// An individual port in the jack server, mapped to a unique (internal) id.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Port {
     portname: String,
-    id: usize,
+    groupname: String,
+    id: JackPortType,
 }
 
-#[derive(Debug)]
+/// A connection between to ports held using the JACK Server native string representation.
+#[derive(Debug, PartialEq)]
 pub struct Connection {
-    pub input: String,
-    pub output: String,
+    pub input: JackPortType,
+    pub output: JackPortType,
 }
 
 impl Group {
@@ -33,9 +42,17 @@ impl Group {
         self.ports.push(port)
     }
 
+    pub fn remove(&mut self, index: usize) {
+        self.ports.remove(index);
+    }
+
     pub fn len(&self) -> usize {
         self.ports.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.ports.is_empty()
+    } 
 
     pub fn name(&self) -> &str {
         &self.name
@@ -47,24 +64,44 @@ impl Group {
 }
 
 impl Port {
+    pub fn new(id: JackPortType, name: String) -> Self {
+        let mut parts: Vec<&str> = name.split(':').collect();
+        let groupname: String = parts.remove(0).to_owned();
+        let portname = parts.join(":");
+     
+        Port {
+            id,
+            portname,
+            groupname,
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.portname
     }
-    pub fn id(&self) -> usize {
+
+    pub fn group(&self) -> &str {
+        &self.groupname
+    }
+
+    pub fn id(&self) -> JackPortType {
         self.id
+    }
+
+    pub fn fullname(&self) -> String {
+        format!("{}:{}", self.groupname, self.portname)
     }
 }
 
 impl PortGroup {
-    pub fn new(is_midi: bool) -> Self {
+    pub fn new() -> Self {
         PortGroup {
-            is_midi,
             groups: Vec::new(),
         }
     }
 
     pub fn merge(&self, rhs: &Self) -> Self {
-        let mut pg = Self::new(false);
+        let mut pg = Self::new();
         for i in self.iter() {
             pg.add_group(i.clone());
         }
@@ -76,32 +113,35 @@ impl PortGroup {
         pg
     }
 
-    pub fn add(&mut self, name: &str) {
-        let mut parts: Vec<&str> = name.split(':').collect();
-        let group: String = parts.remove(0).to_owned();
-        let portname = parts.join(":");
-
-        let port = if self.is_midi {
-            Port {
-                portname,
-                id: self.len() + 1000,
-            }
-        } else {
-            Port {
-                portname,
-                id: self.len(),
-            }
-        };
-
-        let g: &mut Group = match self.groups.iter().position(|r| r.name() == &group) {
+    pub fn add(&mut self, port: Port) {
+        let group = port.group();
+        let g: &mut Group = match self.groups.iter().position(|r| r.name() == group) {
             Some(i) => &mut self.groups[i],
             None => {
-                self.groups.push(Group::new(group));
+                self.groups.push(Group::new(group.to_owned()));
                 self.groups.last_mut().unwrap()
             }
         };
 
         g.add(port);
+    }
+
+    pub fn remove_port_by_id(&mut self, id: JackPortType) -> bool {
+        for (i, g) in self.groups.iter_mut().enumerate() {
+            match g.iter().position(|r| r.id() == id) {
+                Some(j) => {
+                    g.remove(j);
+                    if g.is_empty() {
+                        self.groups.remove(i);
+                    }
+        
+                    return true;
+                },
+                None => (),
+            }
+        }
+
+        return false;
     }
 
     fn add_group(&mut self, group: Group) {
@@ -124,7 +164,18 @@ impl PortGroup {
         self.groups.iter()
     }
 
-    pub fn get_port_name_by_id(&self, id: usize) -> Option<String> {
+    pub fn get_port_by_id(&self, id: JackPortType) -> Option<&Port> {
+        for g in self.groups.iter() {
+            for p in g.iter() {
+                if p.id() == id {
+                    return Some(p);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn get_port_name_by_id(&self, id: JackPortType) -> Option<String> {
         for g in self.groups.iter() {
             for p in g.iter() {
                 if p.id() == id {
