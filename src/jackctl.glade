@@ -24,15 +24,23 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
   <!-- interface-license-type lgplv3 -->
   <object class="GtkAboutDialog" id="aboutdialog">
     <property name="can-focus">False</property>
+    <property name="resizable">False</property>
+    <property name="modal">True</property>
     <property name="window-position">center-on-parent</property>
     <property name="destroy-with-parent">True</property>
+    <property name="icon-name">jackctl-symbolic</property>
     <property name="type-hint">dialog</property>
     <property name="skip-taskbar-hint">True</property>
+    <property name="urgency-hint">True</property>
     <property name="gravity">center</property>
     <property name="program-name">Jack Control Panel</property>
-    <property name="version">0.0 dummy</property>
+    <property name="copyright" translatable="yes">Copyright 2021 SEGFAULT and all other Contributors</property>
     <property name="comments" translatable="yes">Wrangle Your Audio Professionally</property>
-    <property name="logo-icon-name">audio-x-generic</property>
+    <property name="website">https://gitlab.com/IGBC/jackctl</property>
+    <property name="website-label" translatable="yes">Find us on Gitlab</property>
+    <property name="authors">SEGFAULT
+SpaceKookie</property>
+    <property name="logo-icon-name">jackctl-symbolic</property>
     <property name="license-type">gpl-3-0</property>
     <child internal-child="vbox">
       <object class="GtkBox">

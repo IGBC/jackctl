@@ -15,7 +15,7 @@ use gtk::Application;
 use gtk::Builder;
 use gtk::{
     Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook, Orientation,
-    PositionType, Scale, ScaleBuilder, Separator, Window,
+    PositionType, Scale, ScaleBuilder, Separator, Window, AboutDialog,
 };
 
 use crate::mixer::MixerController;
@@ -71,13 +71,16 @@ pub fn init_ui(
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 ) -> (Rc<RefCell<MainDialog>>, Application) {
+    let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    
     // define the gtk application with a unique name and default parameters
     let application = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Initialization failed");
 
+    //application.set_icon_theme_path(icon_path);
+
     let this = MainDialog::new(state, jack_controller, alsa_controller);
     let win_clone = this.clone();
-
     application.connect_startup(move |app| {
         // The CSS "magic" happens here.
         let provider = gtk::CssProvider::new();
@@ -99,7 +102,6 @@ pub fn init_ui(
 
     let mut indicator = AppIndicator::new("jackctl", "");
     indicator.set_status(AppIndicatorStatus::Active);
-    let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     indicator.set_icon_theme_path(icon_path.to_str().unwrap());
     indicator.set_icon_full("jackctl-symbolic", "icon");
     let mut m = gtk::Menu::new();
@@ -162,7 +164,12 @@ impl MainDialog {
         let tabs = get_object(&builder, "tabs.maindialog");
 
         // Setup about screen
-        let about: Window = get_object(&builder, "aboutdialog");
+        let about: AboutDialog = get_object(&builder, "aboutdialog");
+        about.set_version(Some(env!("CARGO_PKG_VERSION")));
+        about.connect_response(move |dialog, _| dialog.hide());
+        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
+        aboutbutton.connect_clicked(move |_| about.show());
+
 
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
@@ -183,12 +190,6 @@ impl MainDialog {
             midi_matrix: Vec::new(),
             mixer_handles: Vec::new(),
         }));
-
-        // hookup the update function
-        let this_clone = this.clone();
-        
-        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
-        aboutbutton.connect_clicked(move |_| this_clone.borrow().show());
 
         // hookup the update function
         let this_clone = this.clone();
