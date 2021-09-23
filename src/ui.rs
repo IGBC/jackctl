@@ -466,6 +466,7 @@ impl MainDialog {
         button.set_margin_start(5);
         button.set_margin_bottom(5);
         button.set_margin_end(5);
+        button.set_halign(Align::Center);
 
         let model = self.state.clone();
 
