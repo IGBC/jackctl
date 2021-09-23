@@ -40,7 +40,7 @@ pub struct MainDialog {
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 
-    //builder: Builder,
+    builder: Builder,
     window: Window,
     xruns_label: Label,
     xruns_icon: Button,
@@ -104,8 +104,9 @@ pub fn init_ui(
     indicator.set_icon_full("jackctl-symbolic", "icon");
     let mut m = gtk::Menu::new();
     let mi = gtk::CheckMenuItem::with_label("exit");
-    mi.connect_activate(|_| {
-        gtk::main_quit();
+    let app_clone = application.clone();
+    mi.connect_activate(move|_| {
+        MainDialog::quit(&app_clone);
     });
     m.append(&mi);
     let mi = gtk::CheckMenuItem::with_label("show");
@@ -168,7 +169,7 @@ impl MainDialog {
             state,
             jack_controller,
             alsa_controller,
-            //builder,
+            builder: builder.clone(),
             window: window.clone(),
             xruns_label,
             xruns_icon,
@@ -185,24 +186,31 @@ impl MainDialog {
 
         // hookup the update function
         let this_clone = this.clone();
-
-        // Setup Main Menu
-        let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
-        quit.connect_clicked(|_| gtk::main_quit());
+        
         let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
         aboutbutton.connect_clicked(move |_| this_clone.borrow().show());
 
         // hookup the update function
         let this_clone = this.clone();
-
+        
         window.connect_draw(move |_, _| this_clone.borrow_mut().update_ui());
 
         this
     }
 
+    pub fn quit(app: &Application) {
+        eprintln!("Shutting down GTK");
+        app.quit();
+    }
+
     pub fn build_ui(&mut self, app: &Application) {
         eprintln!("Setting Window Application");
         self.window.set_application(Some(app));
+
+        // Setup Main Menu
+        let quit: gtk::ModelButton = get_object(&self.builder, "quit.mainmenu");
+        let app_clone = app.clone();
+        quit.connect_clicked(move|_| Self::quit(&app_clone));
     }
 
     pub fn show(&self) {
