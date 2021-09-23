@@ -65,23 +65,20 @@ impl ModelInner {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
             
-            Event::AddCard(id, name) => self.card_detected(id, name),
+            Event::AddCard(id, name) => { self.card_detected(id, name); self.layout_dirty = true; },
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
             
-            Event::AddAudioInput(i) => self.audio_inputs.add(i),
-            Event::AddAudioOutput(o) => self.audio_outputs.add(o),
-            Event::AddMidiInput(i) => self.midi_inputs.add(i),
-            Event::AddMidiOutput(o) => self.midi_outputs.add(o),
+            Event::AddAudioInput(i) => { self.audio_inputs.add(i); self.layout_dirty = true; },
+            Event::AddAudioOutput(o) => { self.audio_outputs.add(o); self.layout_dirty = true; },
+            Event::AddMidiInput(i) => { self.midi_inputs.add(i); self.layout_dirty = true; },
+            Event::AddMidiOutput(o) => { self.midi_outputs.add(o); self.layout_dirty = true; },
             
-            Event::DelPort(id) => self.del_port(id),
+            Event::DelPort(id) => { self.del_port(id); self.layout_dirty = true; },
 
             Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
             Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
-
         }
-
-        self.layout_dirty = true;
     }
 
     fn increment_xruns(&mut self) {

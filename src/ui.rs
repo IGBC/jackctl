@@ -9,11 +9,13 @@ use std::rc::Rc;
 
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
+use gio::prelude::*;
+
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
     Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook, Orientation,
-    PositionType, Scale, ScaleBuilder, Separator, Window,
+    PositionType, Scale, ScaleBuilder, Separator, Window, AboutDialog,
 };
 
 use crate::mixer::MixerController;
@@ -22,6 +24,9 @@ use crate::jack::JackController;
 use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup, Event};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
+
+const STYLE: &str = include_str!("jackctl.css");
+const GLADEFILE: &str = include_str!("jackctl.glade");
 
 struct MixerHandle {
     card_id: i32,
@@ -35,7 +40,7 @@ pub struct MainDialog {
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
 
-    //builder: Builder,
+    builder: Builder,
     window: Window,
     xruns_label: Label,
     xruns_icon: Button,
@@ -65,33 +70,45 @@ pub fn init_ui(
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
     alsa_controller: Rc<RefCell<MixerController>>,
-) -> Rc<RefCell<MainDialog>> {
+) -> (Rc<RefCell<MainDialog>>, Application) {
+    let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    
     // define the gtk application with a unique name and default parameters
-    let _application = Application::new(Some("jackctl.segfault"), Default::default())
+    let application = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Initialization failed");
 
-    // this registers a closure (executing our setup_gui function)
-    //that has to be run on a `activate` event, triggered when the UI is loaded
-    //application.connect_activate(move |app| {
-    //
-    let glade_src = include_str!("jackctl.glade");
+    //application.set_icon_theme_path(icon_path);
 
-    // this builder provides access to all components of the defined ui
-    let builder = Builder::from_string(glade_src);
+    let this = MainDialog::new(state, jack_controller, alsa_controller);
+    let win_clone = this.clone();
+    application.connect_startup(move |app| {
+        // The CSS "magic" happens here.
+        let provider = gtk::CssProvider::new();
+        provider
+            .load_from_data(STYLE.as_bytes())
+            .expect("Failed to load CSS");
+        // We give the CssProvided to the default screen so the CSS rules we added
+        // can be applied to our window.
+        gtk::StyleContext::add_provider_for_screen(
+            &gdk::Screen::get_default().expect("Error initializing gtk css provider."),
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
-    let this = MainDialog::new(builder, state, jack_controller, alsa_controller);
+        win_clone.borrow_mut().build_ui(&app);
+    });
 
     let win_clone = this.clone();
 
     let mut indicator = AppIndicator::new("jackctl", "");
     indicator.set_status(AppIndicatorStatus::Active);
-    let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     indicator.set_icon_theme_path(icon_path.to_str().unwrap());
     indicator.set_icon_full("jackctl-symbolic", "icon");
     let mut m = gtk::Menu::new();
     let mi = gtk::CheckMenuItem::with_label("exit");
-    mi.connect_activate(|_| {
-        gtk::main_quit();
+    let app_clone = application.clone();
+    mi.connect_activate(move|_| {
+        MainDialog::quit(&app_clone);
     });
     m.append(&mi);
     let mi = gtk::CheckMenuItem::with_label("show");
@@ -102,16 +119,18 @@ pub fn init_ui(
     indicator.set_menu(&mut m);
     m.show_all();
 
-    this
+    (this, application)
 }
 
 impl MainDialog {
     pub fn new(
-        builder: Builder,
         state: Model,
         jack_controller: Rc<RefCell<JackController>>,
         alsa_controller: Rc<RefCell<MixerController>>,
     ) -> Rc<RefCell<Self>> {
+        // this builder provides access to all components of the defined ui
+        let builder = Builder::from_string(GLADEFILE);
+
         // Initialise the state:
 
         // find the main dialog
@@ -145,14 +164,19 @@ impl MainDialog {
         let tabs = get_object(&builder, "tabs.maindialog");
 
         // Setup about screen
-        let about: Window = get_object(&builder, "aboutdialog");
+        let about: AboutDialog = get_object(&builder, "aboutdialog");
+        about.set_version(Some(env!("CARGO_PKG_VERSION")));
+        about.connect_response(move |dialog, _| dialog.hide());
+        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
+        aboutbutton.connect_clicked(move |_| about.show());
+
 
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,
             jack_controller,
             alsa_controller,
-            //builder,
+            builder: builder.clone(),
             window: window.clone(),
             xruns_label,
             xruns_icon,
@@ -169,19 +193,25 @@ impl MainDialog {
 
         // hookup the update function
         let this_clone = this.clone();
-
-        // Setup Main Menu
-        let quit: gtk::ModelButton = get_object(&builder, "quit.mainmenu");
-        quit.connect_clicked(|_| gtk::main_quit());
-        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
-        aboutbutton.connect_clicked(move |_| this_clone.borrow().show());
-
-        // hookup the update function
-        let this_clone = this.clone();
-
+        
         window.connect_draw(move |_, _| this_clone.borrow_mut().update_ui());
 
         this
+    }
+
+    pub fn quit(app: &Application) {
+        eprintln!("Shutting down GTK");
+        app.quit();
+    }
+
+    pub fn build_ui(&mut self, app: &Application) {
+        eprintln!("Setting Window Application");
+        self.window.set_application(Some(app));
+
+        // Setup Main Menu
+        let quit: gtk::ModelButton = get_object(&self.builder, "quit.mainmenu");
+        let app_clone = app.clone();
+        quit.connect_clicked(move|_| Self::quit(&app_clone));
     }
 
     pub fn show(&self) {
@@ -213,7 +243,9 @@ impl MainDialog {
             let mut curr_x = 2;
             for (i, g) in inputs.iter().enumerate() {
                 let l = grid_label(g.name(), true);
-                l.set_line_wrap(true);
+                // Don't re-enable this, it causes a spacing bug
+                // TODO: Manual Word Wrapping.
+                //l.set_line_wrap(true);
                 grid.attach(&l, curr_x, 0, g.len() as i32, 1);
 
                 for n in g.iter() {
@@ -443,6 +475,7 @@ impl MainDialog {
         button.set_margin_start(5);
         button.set_margin_bottom(5);
         button.set_margin_end(5);
+        button.set_halign(Align::Center);
 
         let model = self.state.clone();
 
@@ -502,6 +535,8 @@ fn grid_label(text: &str, vertical: bool) -> Label {
         l.set_valign(Align::End);
     } else {
         l.set_halign(Align::End);
+        l.set_justify(gtk::Justification::Right);
+        l.set_xalign(1.0);
     }
     l
 }

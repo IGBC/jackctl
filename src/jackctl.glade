@@ -24,15 +24,23 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
   <!-- interface-license-type lgplv3 -->
   <object class="GtkAboutDialog" id="aboutdialog">
     <property name="can-focus">False</property>
+    <property name="resizable">False</property>
+    <property name="modal">True</property>
     <property name="window-position">center-on-parent</property>
     <property name="destroy-with-parent">True</property>
+    <property name="icon-name">jackctl-symbolic</property>
     <property name="type-hint">dialog</property>
     <property name="skip-taskbar-hint">True</property>
+    <property name="urgency-hint">True</property>
     <property name="gravity">center</property>
     <property name="program-name">Jack Control Panel</property>
-    <property name="version">0.0 dummy</property>
+    <property name="copyright" translatable="yes">Copyright 2021 SEGFAULT and all other Contributors</property>
     <property name="comments" translatable="yes">Wrangle Your Audio Professionally</property>
-    <property name="logo-icon-name">audio-x-generic</property>
+    <property name="website">https://gitlab.com/IGBC/jackctl</property>
+    <property name="website-label" translatable="yes">Find us on Gitlab</property>
+    <property name="authors">SEGFAULT
+SpaceKookie</property>
+    <property name="logo-icon-name">jackctl-symbolic</property>
     <property name="license-type">gpl-3-0</property>
     <child internal-child="vbox">
       <object class="GtkBox">
@@ -146,10 +154,10 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
   <object class="GtkWindow" id="maindialog">
     <property name="name">maindialog</property>
     <property name="can-focus">False</property>
-    <property name="type-hint">utility</property>
+    <property name="modal">True</property>
+    <property name="icon">jackctl-symbolic.svg</property>
     <property name="urgency-hint">True</property>
     <property name="deletable">False</property>
-    <property name="has-resize-grip">True</property>
     <child>
       <object class="GtkBox">
         <property name="can-focus">False</property>
@@ -157,132 +165,6 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
         <property name="vexpand">True</property>
         <property name="orientation">vertical</property>
         <property name="spacing">2</property>
-        <child>
-          <object class="GtkHeaderBar">
-            <property name="visible">True</property>
-            <property name="can-focus">False</property>
-            <property name="title" translatable="yes">Jack Control Panel</property>
-            <property name="has-subtitle">False</property>
-            <property name="show-close-button">True</property>
-            <child>
-              <object class="GtkButtonBox">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">start</property>
-                <property name="valign">center</property>
-                <property name="margin-end">5</property>
-                <property name="layout-style">expand</property>
-                <child>
-                  <object class="GtkButton" id="open.maindialog">
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="receives-default">True</property>
-                    <child>
-                      <object class="GtkImage">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="tooltip-text" translatable="yes">Open Scene</property>
-                        <property name="icon-name">document-open-symbolic</property>
-                      </object>
-                    </child>
-                  </object>
-                  <packing>
-                    <property name="expand">True</property>
-                    <property name="fill">True</property>
-                    <property name="position">0</property>
-                    <property name="non-homogeneous">True</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkMenuButton" id="recent.open.maindialog">
-                    <property name="name">menu-button</property>
-                    <property name="visible">True</property>
-                    <property name="can-focus">True</property>
-                    <property name="receives-default">True</property>
-                    <property name="popup">recentchoosermenu1</property>
-                    <child>
-                      <object class="GtkImage">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="icon-name">pan-down-symbolic</property>
-                      </object>
-                    </child>
-                  </object>
-                  <packing>
-                    <property name="expand">True</property>
-                    <property name="fill">True</property>
-                    <property name="position">1</property>
-                    <property name="non-homogeneous">True</property>
-                  </packing>
-                </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkButton" id="minimise.maindialog">
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="relief">none</property>
-                <child>
-                  <object class="GtkImage">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="icon-name">window-minimize-symbolic</property>
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="pack-type">end</property>
-                <property name="position">1</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkMenuButton" id="menu.maindialog">
-                <property name="name">menu-button</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="popover">mainmenu</property>
-                <child>
-                  <object class="GtkImage">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="icon-name">open-menu-symbolic</property>
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="pack-type">end</property>
-                <property name="position">2</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkButton" id="save.maindialog">
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="tooltip-text" translatable="yes">Save Scene</property>
-                <property name="valign">center</property>
-                <property name="margin-end">5</property>
-                <child>
-                  <object class="GtkImage">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="icon-name">document-save-as-symbolic</property>
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="position">3</property>
-              </packing>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
         <child>
           <object class="GtkNotebook" id="tabs.maindialog">
             <property name="visible">True</property>
@@ -354,7 +236,7 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
               </packing>
             </child>
             <child>
-              <!-- n-columns=2 n-rows=4 -->
+              <!-- n-columns=3 n-rows=4 -->
               <object class="GtkGrid">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
@@ -436,7 +318,7 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
                     <property name="can-focus">True</property>
                     <property name="hexpand">True</property>
                     <child>
-                      <!-- n-columns=2 n-rows=3 -->
+                      <!-- n-columns=3 n-rows=3 -->
                       <object class="GtkGrid">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
@@ -545,6 +427,15 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
                             <property name="left-attach">1</property>
                             <property name="top-attach">0</property>
                           </packing>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
                         </child>
                         <child>
                           <placeholder/>
@@ -760,6 +651,18 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
                     <property name="top-attach">1</property>
                   </packing>
                 </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
               </object>
               <packing>
                 <property name="position">3</property>
@@ -828,7 +731,7 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="position">1</property>
+            <property name="position">0</property>
           </packing>
         </child>
         <child>
@@ -946,7 +849,128 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    <child type="titlebar">
+      <object class="GtkHeaderBar">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="title" translatable="yes">Jack Control Panel</property>
+        <property name="has-subtitle">False</property>
+        <property name="show-close-button">True</property>
+        <child>
+          <object class="GtkButtonBox">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="halign">start</property>
+            <property name="valign">center</property>
+            <property name="margin-end">5</property>
+            <property name="layout-style">expand</property>
+            <child>
+              <object class="GtkButton" id="open.maindialog">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <child>
+                  <object class="GtkImage">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Open Scene</property>
+                    <property name="icon-name">document-open-symbolic</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+                <property name="non-homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkMenuButton" id="recent.open.maindialog">
+                <property name="name">menu-button</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="popup">recentchoosermenu1</property>
+                <child>
+                  <object class="GtkImage">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="icon-name">pan-down-symbolic</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+                <property name="non-homogeneous">True</property>
+              </packing>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkButton" id="minimise.maindialog">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="relief">none</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="icon-name">window-minimize-symbolic</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkMenuButton" id="menu.maindialog">
+            <property name="name">menu-button</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="popover">mainmenu</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="icon-name">open-menu-symbolic</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="pack-type">end</property>
             <property name="position">2</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="save.maindialog">
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="tooltip-text" translatable="yes">Save Scene</property>
+            <property name="valign">center</property>
+            <property name="margin-end">5</property>
+            <child>
+              <object class="GtkImage">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="icon-name">document-save-as-symbolic</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="position">3</property>
           </packing>
         </child>
       </object>
