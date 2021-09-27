@@ -1,3 +1,6 @@
+mod reservedevice1;
+
+use alsa::seq::Connect;
 use psutil::process;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -10,6 +13,9 @@ use std::panic;
 use std::process::abort;
 
 use gtk::prelude::*;
+use dbus::blocking::Connection;
+use dbus::blocking::stdintf::org_freedesktop_dbus::{Introspectable, Properties};
+
 
 use crate::model::Model;
 use crate::model::{Card, CardStatus};
@@ -18,13 +24,14 @@ struct CardEntry {
     pub id: i32,
     pub in_proc: Option<Child>,
     pub out_proc: Option<Child>,
+    // DBUS Server goes here.
 }
 
 pub struct ProcessManager {
     jack_process: Option<Child>,
     card_processes: HashMap<i32, CardEntry>, // ID, card
-
     model: Model,
+
 }
 
 impl CardEntry {
@@ -37,7 +44,7 @@ impl CardEntry {
     }
 }
 
-static mut MUT_JACKCTL_SPAWNED_SERVER: bool = false;
+static mut jackctl_spawned_server: bool = false;
 
 
 fn panic_kill(info: &panic::PanicInfo) -> ! {
@@ -45,13 +52,12 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
     eprintln!("{}", info);
 
     eprintln!("Killing children (violently)");
-    // We're throwing the results away cos this is a panic handler... what are we gonna do if it fails?!
-    let _ = Command::new("killall").arg("-9").arg("alsa_in").spawn();
-    let _ = Command::new("killall").arg("-9").arg("alsa_out").spawn();
+    Command::new("killall").arg("-9").arg("alsa_in").spawn();
+    Command::new("killall").arg("-9").arg("alsa_out").spawn();
     unsafe {
-        if MUT_JACKCTL_SPAWNED_SERVER {
+        if jackctl_spawned_server {
             eprintln!("Killing Local Server");
-            let _ = Command::new("killall").arg("-9").arg("jackd").spawn();
+            Command::new("killall").arg("-9").arg("jackd").spawn();
         }
     }
 
@@ -72,7 +78,6 @@ impl ProcessManager {
         } else {
             println!("starting jackd");
             let jack_proc = Command::new("jackd")
-                .arg("-r")
                 .arg("-d")
                 .arg("dummy")
                 // .stdout(Stdio::piped())
@@ -82,7 +87,7 @@ impl ProcessManager {
 
             //wait for jack to start,
             unsafe {
-                MUT_JACKCTL_SPAWNED_SERVER = true;
+                jackctl_spawned_server = true;
             }
             thread::sleep(Duration::from_secs(1));
             Some(jack_proc)
@@ -91,6 +96,7 @@ impl ProcessManager {
         let this = Rc::new(RefCell::new(Self {
             jack_process,
             card_processes: HashMap::new(),
+            dbus_connection,
             model,
         }));
 
@@ -106,7 +112,7 @@ impl ProcessManager {
 
     fn update_processes(&mut self) {
         let model = self.model.clone();
-        for card in model.lock().unwrap().cards.values() {
+        for card in model.borrow().cards.values() {
             match card.state {
                 CardStatus::Active => {
                     if !self.card_processes.contains_key(&card.id) {

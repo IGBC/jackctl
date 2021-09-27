@@ -1,5 +1,6 @@
 use alsa::pcm::{HwParams, PCM};
-use alsa::Direction;
+use alsa::{Direction, Ctl, HCtl};
+use alsa::device_name;
 use std::env;
 use std::process::abort;
 use std::fs;
@@ -20,15 +21,15 @@ fn check_playback(id: &str) {
             let start = hwp.get_channels_min().unwrap();
             let end = hwp.get_channels_max().unwrap()+1;
 
-            println!("    Playback channels: {}, {}", start, end-1);
+            println!("    Playback channels: min = {}, max = {}", start, end-1);
             //,         hwp.get_channels().unwrap());
             hwp.set_rate_resample(false).unwrap();
-            for rate in EXTENDED_SAMPLE_RATES.iter() {
+            for rate in 1..4000000 {
                 let mut chans: Vec<u32> = Vec::new();
             
                 for n in start..end {
                     if hwp.test_channels(n).is_ok() {
-                        match hwp.test_rate(*rate) {
+                        match hwp.test_rate(rate) {
                             Ok(()) => {
                                 chans.push(n);
                             },
@@ -56,15 +57,15 @@ fn check_capture(id: &str) {
             let start = hwp.get_channels_min().unwrap();
             let end = hwp.get_channels_max().unwrap()+1;
 
-            println!("    Capture channels: {}, {}", start, end-1);
+            println!("    Capture channels: min = {}, max = {}", start, end-1);
             //,         hwp.get_channels().unwrap());
             hwp.set_rate_resample(false).unwrap();
-            for rate in EXTENDED_SAMPLE_RATES.iter() {
+            for rate in 1..4000000 {
                 let mut chans: Vec<u32> = Vec::new();
             
                 for n in start..end {
                     if hwp.test_channels(n).is_ok() {
-                        match hwp.test_rate(*rate) {
+                        match hwp.test_rate(rate) {
                             Ok(()) => {
                                 chans.push(n);
                             },
@@ -84,6 +85,56 @@ fn check_capture(id: &str) {
     }
 }
 
+
+fn check_hctls(id: &str) {
+    match HCtl::open(&CString::new(id).unwrap(), false) {
+        Ok(h) => {
+            h.load().unwrap();
+            println!("    HCtls:");
+            for b in h.elem_iter() {
+                let id = b.get_id().unwrap();
+                let info = b.info().unwrap();
+                let int = id.get_interface();
+                let name = id.get_name().unwrap();
+                println!("        {} ({},{} {} {}) {:?} - {} x {:?}", 
+                    name,
+                    id.get_device(),
+                    id.get_subdevice(),
+                    id.get_numid(),
+                    id.get_index(),
+                    int,
+                    info.get_count(),
+                    info.get_type(),
+                )
+            }
+        },
+        Err(e) => {
+            println!("   HCtl - cannot open card: {}", e);
+        }
+    }
+    
+}
+
+fn check_ctls(id: &str) {
+    println!("    Ctl: ");
+    let a_info = Ctl::new(&id, false).unwrap().card_info().unwrap();
+    println!("                id: {}", a_info.get_id().unwrap());
+    println!("              name: {}", a_info.get_name().unwrap());
+    println!("          longname: {}", a_info.get_longname().unwrap());
+    println!("         mixername: {}", a_info.get_mixername().unwrap());
+    println!("            driver: {}", a_info.get_driver().unwrap());
+    println!("        components: {}", a_info.get_components().unwrap());
+}
+
+fn check_names(id: &str) {
+    let alsa_card = Ctl::new(&id, false).unwrap().card_info().unwrap().get_card();
+    for t in &["pcm", "ctl", "rawmidi", "timer", "seq", "hwdep"] {
+        println!("    {} devices:", t);
+        let i = device_name::HintIter::new(Some(&alsa_card), &*CString::new(*t).unwrap()).unwrap();
+        for a in i { println!("        [{}]: \"{}\" - Direction {}", a.name.unwrap(), a.desc.unwrap().replace('\n', " "), a.direction.map(|x| format!("{:?}", x)).unwrap_or("None".to_owned())) }
+    }
+}
+
 fn print_usage() {
     eprintln!("usage: enum_cards [alsa|sys]");
     abort();
@@ -100,6 +151,9 @@ fn main() {
             for a in ::alsa::card::Iter::new().map(|x| x.unwrap()) {
                 println!("hw:{} - {}", a.get_index(), a.get_name().unwrap());
                 let id = format!("hw:{}", a.get_index());
+                check_ctls(&id);
+                check_hctls(&id);
+                check_names(&id);
                 check_playback(&id);
                 check_capture(&id);
             }
