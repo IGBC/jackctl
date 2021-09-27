@@ -39,6 +39,7 @@
 mod app;
 mod cards;
 mod clients;
+mod jack;
 
 use crate::error::SettingsError;
 use serde::de::DeserializeOwned;
