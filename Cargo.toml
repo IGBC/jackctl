@@ -12,6 +12,8 @@ gio = {version = "0.9.1", features = ["v2_56"] }
 gdk = "^0.13.2"
 glib = "*"
 libappindicator = "0.5"
+dbus = "0.9.4"
+dbus-tree = "0.9.1"
 
 psutil = "3.2"
 ctrlc = { version = "3.1", features = ["termination"] }

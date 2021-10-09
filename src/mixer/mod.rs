@@ -1,3 +1,6 @@
+//mod card_lock;
+mod reservedevice1;
+
 use gtk::prelude::*;
 
 use alsa::card::Iter as CardIter;
@@ -8,12 +11,17 @@ use alsa::Direction;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::collections::HashMap;
+
+//use card_lock::CardLock;
 
 use crate::model::{CardStatus, Model, Event};
 
 pub struct MixerController {
     model: Model,
+    //locks: HashMap<CardId, CardLock>,
 }
+
 
 const SAMPLE_RATES: [u32; 20] = [
     8000,   // Telephone Audio
@@ -45,13 +53,19 @@ pub type SampleRate = u32;
 
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
-        let this = Rc::new(RefCell::new(Self { model }));
+        let this = Rc::new(RefCell::new(
+            Self { 
+                model,
+                //locks: HashMap::new(), 
+            }));
 
         let this_clone = this.clone();
         glib::timeout_add_local(200, move || {
             this_clone.borrow_mut().update();
             Continue(true)
         });
+
+        //card_lock::CardLock::create_server();
 
         this
     }
