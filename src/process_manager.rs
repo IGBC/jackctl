@@ -1,18 +1,16 @@
+use crate::model::Model;
+use crate::model::{Card, CardStatus};
+use gtk::prelude::*;
 use psutil::process;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io;
+use std::panic;
+use std::process::abort;
 use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
-use std::panic;
-use std::process::abort;
-
-use gtk::prelude::*;
-
-use crate::model::Model;
-use crate::model::{Card, CardStatus};
 
 struct CardEntry {
     pub id: i32,
@@ -39,7 +37,6 @@ impl CardEntry {
 
 static mut MUT_JACKCTL_SPAWNED_SERVER: bool = false;
 
-
 fn panic_kill(info: &panic::PanicInfo) -> ! {
     // logs "panicked at '$reason', src/main.rs:27:4" to the host stderr
     eprintln!("{}", info);
@@ -58,10 +55,8 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
     abort();
 }
 
-
 impl ProcessManager {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
-        
         panic::set_hook(Box::new(|pi| {
             panic_kill(pi);
         }));
@@ -209,7 +204,7 @@ impl ProcessManager {
             Some(p) => {
                 println!("stopping server");
                 p.kill()
-            },
+            }
             None => Ok(()),
         };
     }

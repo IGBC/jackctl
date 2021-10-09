@@ -1,18 +1,17 @@
 //! Jackctl's Model and Event to drive the applications's MVC pattern
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use std::collections::HashMap;
-
 mod card;
-mod port;
 mod event;
+mod port;
 
 pub use card::*;
 pub use port::*;
 
 pub use event::Event;
 
-/// Wrapper around a Mutexed Copy of the Model, 
+/// Wrapper around a Mutexed Copy of the Model,
 /// use this instead of the model directly to
 /// easilly allow changes to the Mutex used.
 pub type Model = Arc<Mutex<ModelInner>>;
@@ -39,8 +38,8 @@ pub struct ModelInner {
 }
 
 impl ModelInner {
-   /// Returns a new model, in default state. Don't assume
-   /// anything is configured or initialised in this constructor.   
+    /// Returns a new model, in default state. Don't assume
+    /// anything is configured or initialised in this constructor.   
     pub fn new() -> Model {
         Arc::new(Mutex::new(ModelInner {
             ixruns: 0,
@@ -64,17 +63,35 @@ impl ModelInner {
         match evt {
             Event::XRun => self.increment_xruns(),
             Event::ResetXruns => self.reset_xruns(),
-            
-            Event::AddCard(id, name) => { self.card_detected(id, name); self.layout_dirty = true; },
+
+            Event::AddCard(id, name) => {
+                self.card_detected(id, name);
+                self.layout_dirty = true;
+            }
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
-            
-            Event::AddAudioInput(i) => { self.audio_inputs.add(i); self.layout_dirty = true; },
-            Event::AddAudioOutput(o) => { self.audio_outputs.add(o); self.layout_dirty = true; },
-            Event::AddMidiInput(i) => { self.midi_inputs.add(i); self.layout_dirty = true; },
-            Event::AddMidiOutput(o) => { self.midi_outputs.add(o); self.layout_dirty = true; },
-            
-            Event::DelPort(id) => { self.del_port(id); self.layout_dirty = true; },
+
+            Event::AddAudioInput(i) => {
+                self.audio_inputs.add(i);
+                self.layout_dirty = true;
+            }
+            Event::AddAudioOutput(o) => {
+                self.audio_outputs.add(o);
+                self.layout_dirty = true;
+            }
+            Event::AddMidiInput(i) => {
+                self.midi_inputs.add(i);
+                self.layout_dirty = true;
+            }
+            Event::AddMidiOutput(o) => {
+                self.midi_outputs.add(o);
+                self.layout_dirty = true;
+            }
+
+            Event::DelPort(id) => {
+                self.del_port(id);
+                self.layout_dirty = true;
+            }
 
             Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
             Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
@@ -94,10 +111,18 @@ impl ModelInner {
     }
 
     fn del_port(&mut self, id: JackPortType) {
-        if self.audio_inputs.remove_port_by_id(id) { return };
-        if self.audio_outputs.remove_port_by_id(id) { return };
-        if self.midi_inputs.remove_port_by_id(id) { return };
-        if self.midi_outputs.remove_port_by_id(id) { return };
+        if self.audio_inputs.remove_port_by_id(id) {
+            return;
+        };
+        if self.audio_outputs.remove_port_by_id(id) {
+            return;
+        };
+        if self.midi_inputs.remove_port_by_id(id) {
+            return;
+        };
+        if self.midi_outputs.remove_port_by_id(id) {
+            return;
+        };
     }
 
     pub fn audio_inputs(&self) -> &PortGroup {
@@ -148,36 +173,53 @@ impl ModelInner {
         let input = match self.find_port(idx) {
             Some(p) => p,
             None => {
-                eprintln!("ERROR: Attempting to connect from non existant port {}", idx);
-                return 
-            },
+                eprintln!(
+                    "ERROR: Attempting to connect from non existant port {}",
+                    idx
+                );
+                return;
+            }
         };
 
         let output = match self.find_port(idy) {
             Some(p) => p,
             None => {
-                eprintln!("ERROR: Attempting to connect to non existant port {} from port \"{}\" ", idy, input.fullname());
-                return 
-            },
+                eprintln!(
+                    "ERROR: Attempting to connect to non existant port {} from port \"{}\" ",
+                    idy,
+                    input.fullname()
+                );
+                return;
+            }
         };
 
-        let new_connection: Connection = Connection{input: idx, output: idy};
+        let new_connection: Connection = Connection {
+            input: idx,
+            output: idy,
+        };
         if self.connections.contains(&new_connection) {
-            eprintln!("ERROR Attempting to connect {} to {} -> already connected", input.fullname(), output.fullname());
+            eprintln!(
+                "ERROR Attempting to connect {} to {} -> already connected",
+                input.fullname(),
+                output.fullname()
+            );
         } else {
             self.connections.push(new_connection);
         }
     }
 
     fn remove_connection(&mut self, input: JackPortType, output: JackPortType) {
-        let old_connection = Connection{input, output};
+        let old_connection = Connection { input, output };
         match self.connections.iter().position(|r| r == &old_connection) {
             Some(i) => {
                 self.connections.remove(i);
-            },
+            }
             None => {
-                eprintln!("error trying to remove non existing connection between ports {} and {}", input, output);
-            },
+                eprintln!(
+                    "error trying to remove non existing connection between ports {} and {}",
+                    input, output
+                );
+            }
         }
     }
 
@@ -197,7 +239,7 @@ impl ModelInner {
         if output_name.is_none() || input_name.is_none() {
             return false;
         }
-        
+
         let output_name = output_name.unwrap();
         let input_name = input_name.unwrap();
         for c in self.connections.iter() {

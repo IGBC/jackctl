@@ -52,7 +52,7 @@ impl Group {
 
     pub fn is_empty(&self) -> bool {
         self.ports.is_empty()
-    } 
+    }
 
     pub fn name(&self) -> &str {
         &self.name
@@ -68,7 +68,7 @@ impl Port {
         let mut parts: Vec<&str> = name.split(':').collect();
         let groupname: String = parts.remove(0).to_owned();
         let portname = parts.join(":");
-     
+
         Port {
             id,
             portname,
@@ -95,9 +95,7 @@ impl Port {
 
 impl PortGroup {
     pub fn new() -> Self {
-        PortGroup {
-            groups: Vec::new(),
-        }
+        PortGroup { groups: Vec::new() }
     }
 
     pub fn merge(&self, rhs: &Self) -> Self {
@@ -134,9 +132,9 @@ impl PortGroup {
                     if g.is_empty() {
                         self.groups.remove(i);
                     }
-        
+
                     return true;
-                },
+                }
                 None => (),
             }
         }
