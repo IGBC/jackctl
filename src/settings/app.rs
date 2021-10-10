@@ -17,7 +17,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             ui_launch_mode: UiLaunchMode::Wizard,
-            jack: JackSettings::default()
+            jack: JackSettings::default(),
         }
     }
 }

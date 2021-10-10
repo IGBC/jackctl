@@ -13,25 +13,32 @@ pub struct Card {
     pub state: CardStatus,
 }
 
-
 /// Defines all the state a card can be in
 #[derive(Clone, Debug, PartialEq)]
 pub enum CardStatus {
     /// We just found this card, we don't know anything about it yet
-    Unknown,
+    New,
+    /// This Card should be enumerated now
+    Enum,
+    /// This Card should be started now
+    Start,
     /// this card is in use
     Active,
-    /// This card could not be claimed, we should try again later
-    Busy,
+    /// This card was just stopped, it should be put back into new in a few seconds
+    Stopped,
     /// This card could not be enumerated, we are going to leave it alone
     EnumFailed,
+    /// This card could not be started, we are going to leave it alone
+    StartFailed,
+    /// This card is busy, put back to new after a timeout,
+    Busy,
     /// The user has told us not to use this card
     DontUse,
 }
 
-/// Struct representing a mixer channel in the model. 
+/// Struct representing a mixer channel in the model.
 /// A mixer channel is a typically a volume slider and a mute switch exposed
-/// as by ALSA. 
+/// as by ALSA.
 #[derive(Debug, PartialEq)]
 pub struct MixerChannel {
     pub id: u32,
@@ -86,7 +93,7 @@ impl Card {
             outputs: None,
             name,
             channels: HashMap::new(),
-            state: CardStatus::Unknown,
+            state: CardStatus::New,
         }
     }
 

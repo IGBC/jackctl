@@ -1,5 +1,5 @@
 //! All of the GTK stuff stuffed into a module so that the rest of the program can be designed sanely.
-//! 
+//!
 //! Don't expect me to document this module. It will change with every tiny change to the GUI.
 
 use std::cell::RefCell;
@@ -7,21 +7,21 @@ use std::env;
 use std::path::Path;
 use std::rc::Rc;
 
+use gio::prelude::*;
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
-use gio::prelude::*;
 
 use gtk::Application;
 use gtk::Builder;
 use gtk::{
-    Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook, Orientation,
-    PositionType, Scale, ScaleBuilder, Separator, Window, AboutDialog,
+    AboutDialog, Adjustment, Align, Button, CheckButton, Grid, Label, LevelBar, Notebook,
+    Orientation, PositionType, Scale, ScaleBuilder, Separator, Window,
 };
 
 use crate::mixer::MixerController;
 
 use crate::jack::JackController;
-use crate::model::{MixerChannel, Model, ModelInner, Port, PortGroup, Event};
+use crate::model::{Event, MixerChannel, Model, ModelInner, Port, PortGroup};
 
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 
@@ -72,7 +72,7 @@ pub fn init_ui(
     alsa_controller: Rc<RefCell<MixerController>>,
 ) -> (Rc<RefCell<MainDialog>>, Application) {
     let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    
+
     // define the gtk application with a unique name and default parameters
     let application = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Initialization failed");
@@ -107,7 +107,7 @@ pub fn init_ui(
     let mut m = gtk::Menu::new();
     let mi = gtk::CheckMenuItem::with_label("exit");
     let app_clone = application.clone();
-    mi.connect_activate(move|_| {
+    mi.connect_activate(move |_| {
         MainDialog::quit(&app_clone);
     });
     m.append(&mi);
@@ -146,7 +146,7 @@ impl MainDialog {
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
         let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
         let state_clone = state.clone();
-        xruns_icon.connect_clicked(move |icon| { 
+        xruns_icon.connect_clicked(move |icon| {
             state_clone.lock().unwrap().update(Event::ResetXruns);
             icon.hide();
         });
@@ -170,7 +170,6 @@ impl MainDialog {
         let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
         aboutbutton.connect_clicked(move |_| about.show());
 
-
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
             state,
@@ -193,7 +192,7 @@ impl MainDialog {
 
         // hookup the update function
         let this_clone = this.clone();
-        
+
         window.connect_draw(move |_, _| this_clone.borrow_mut().update_ui());
 
         this
@@ -211,7 +210,7 @@ impl MainDialog {
         // Setup Main Menu
         let quit: gtk::ModelButton = get_object(&self.builder, "quit.mainmenu");
         let app_clone = app.clone();
-        quit.connect_clicked(move|_| Self::quit(&app_clone));
+        quit.connect_clicked(move |_| Self::quit(&app_clone));
     }
 
     pub fn show(&self) {
@@ -314,7 +313,13 @@ impl MainDialog {
         grid.set_hexpand(true);
         grid.set_vexpand(true);
         if model.cards.is_empty() {
-            grid.attach(&mixer_label("No controllable devices are detected.", false), 0,0,1,1);
+            grid.attach(
+                &mixer_label("No controllable devices are detected.", false),
+                0,
+                0,
+                1,
+                1,
+            );
             return (grid, handles);
         }
 
@@ -481,7 +486,8 @@ impl MainDialog {
 
         let signal_id = button.connect_clicked(move |cb| {
             model
-                .lock().unwrap()
+                .lock()
+                .unwrap()
                 .update(Event::SetMuting(card_id, channel, cb.get_active()));
         });
         (button, signal_id)
@@ -506,7 +512,8 @@ impl MainDialog {
 
         let signal = a.connect_value_changed(move |a| {
             model
-                .lock().unwrap()
+                .lock()
+                .unwrap()
                 .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
         });
 

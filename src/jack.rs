@@ -1,19 +1,17 @@
 //! Jackctl's connection to the JACK server.
 
+use crate::model::{Event, JackPortType, Model, Port};
+use gtk::prelude::*;
+use jack::Client as JackClient;
+use jack::Error as JackError;
+use jack::InternalClientID;
+use jack::Port as JackPort;
+use jack::{AsyncClient, NotificationHandler, PortFlags, PortId, Unowned};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
-
-use gtk::prelude::*;
-
-use jack::Client as JackClient;
-use jack::{PortFlags, NotificationHandler, PortId, AsyncClient, Unowned};
-use jack::Port as JackPort;
-use jack::Error as JackError;
-
-use crate::model::{Model, Event, JackPortType, Port};
-
 enum PortType {
     Audio,
     Midi,
@@ -25,7 +23,6 @@ enum PortDirection {
     Output,
 }
 
-
 pub struct JackNotificationController {
     model: Model,
 }
@@ -34,7 +31,7 @@ pub struct JackNotificationController {
 pub struct JackController {
     model: Model,
     interface: AsyncClient<JackNotificationController, ()>,
-    // async_interface: jack::AsyncClient<JackNotificationController, ()>,
+    cards: HashMap<String, InternalClientID>,
 }
 
 impl JackController {
@@ -56,12 +53,13 @@ impl JackController {
         let async_controller = JackNotificationController {
             model: model.clone(),
         };
-        
+
         let interface = client.activate_async(async_controller, ()).unwrap();
-        
+
         let this = Rc::new(RefCell::new(Self {
             model,
             interface,
+            cards: HashMap::new(),
         }));
 
         this.borrow_mut().interval_update();
@@ -75,7 +73,12 @@ impl JackController {
     }
 
     /// Connect two jack ports together on the server.
-    pub fn connect_ports(&self, portid1: JackPortType, portid2: JackPortType, connect: bool) -> bool {
+    pub fn connect_ports(
+        &self,
+        portid1: JackPortType,
+        portid2: JackPortType,
+        connect: bool,
+    ) -> bool {
         let model = self.model.lock().unwrap();
         let input = model.inputs().get_port_name_by_id(portid2);
         let output = model.outputs().get_port_name_by_id(portid1);
@@ -86,9 +89,13 @@ impl JackController {
             let input = input.unwrap();
             let output = output.unwrap();
             let result = if connect {
-                self.interface.as_client().connect_ports_by_name(&output, &input)
+                self.interface
+                    .as_client()
+                    .connect_ports_by_name(&output, &input)
             } else {
-                self.interface.as_client().disconnect_ports_by_name(&output, &input)
+                self.interface
+                    .as_client()
+                    .disconnect_ports_by_name(&output, &input)
             };
             match result {
                 Ok(()) => connect,
@@ -131,6 +138,38 @@ impl JackController {
         out.append(&mut soft_ports);
         out
     }
+
+    fn launch_card(
+        &mut self,
+        id: &str,
+        name: &str,
+        in_ports: u32,
+        out_ports: u32,
+        nperiods: u32,
+        quality: u32,
+    ) -> Result<(), jack::Error> {
+        let client = self.interface.as_client();
+        let rate = client.sample_rate();
+        let psize = client.buffer_size();
+        let args = format!(
+            "-d {} -r {} -p {} -n {} -i {} -o {} -q {}",
+            id, rate, psize, nperiods, in_ports, out_ports, quality
+        );
+        let result = client.load_internal_client(name, "audioadapter", &args)?;
+        self.cards.insert(id.to_owned(), result);
+        Ok(())
+    }
+
+    fn recover_card(&mut self, id: &str) -> bool {
+        let key = self.cards.get(id);
+        match key {
+            Some(id) => {
+                let result = self.interface.as_client().unload_internal_client(*id);
+                result.is_ok()
+            }
+            None => true,
+        }
+    }
 }
 
 impl JackNotificationController {
@@ -152,7 +191,6 @@ impl JackNotificationController {
     }
 }
 
-
 impl NotificationHandler for JackNotificationController {
     fn client_registration(&mut self, _: &jack::Client, _name: &str, _is_registered: bool) {
         eprintln!("EVENT: client_registration {}, {}", _name, _is_registered);
@@ -173,7 +211,10 @@ impl NotificationHandler for JackNotificationController {
             let name = match jack_port.name() {
                 Ok(n) => n,
                 Err(e) => {
-                    eprintln!("ERROR: Jack refused to give name for port {}: {}", port_id, e);
+                    eprintln!(
+                        "ERROR: Jack refused to give name for port {}: {}",
+                        port_id, e
+                    );
                     return;
                 }
             };
@@ -186,35 +227,54 @@ impl NotificationHandler for JackNotificationController {
                 Ok(pt) => pt,
                 Err(e) => {
                     eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
-                    return
+                    return;
                 }
             };
 
             match pt {
                 (PortType::Audio, PortDirection::Input) => model.update(Event::AddAudioInput(port)),
-                (PortType::Audio, PortDirection::Output) => model.update(Event::AddAudioOutput(port)),
+                (PortType::Audio, PortDirection::Output) => {
+                    model.update(Event::AddAudioOutput(port))
+                }
                 (PortType::Midi, PortDirection::Input) => model.update(Event::AddMidiInput(port)),
                 (PortType::Midi, PortDirection::Output) => model.update(Event::AddMidiOutput(port)),
                 (PortType::Unknown(f), _) => {
                     println!("Unknown port format \"{}\" for port {}", f, name);
                     return;
-                },
+                }
             }
         } else {
             let mut model = self.model.lock().unwrap();
             model.update(Event::DelPort(port_id));
         }
-        
     }
 
-    fn port_rename(&mut self, _: &jack::Client, _port_id: PortId, _old_name: &str, _new_name: &str) -> jack::Control {
-        eprintln!("EVENT: port_rename {}, {}, {}", _port_id, _old_name, _new_name);
+    fn port_rename(
+        &mut self,
+        _: &jack::Client,
+        _port_id: PortId,
+        _old_name: &str,
+        _new_name: &str,
+    ) -> jack::Control {
+        eprintln!(
+            "EVENT: port_rename {}, {}, {}",
+            _port_id, _old_name, _new_name
+        );
         eprintln!("Error: port renaming unimplemented");
         jack::Control::Continue
     }
 
-    fn ports_connected(&mut self, _: &jack::Client, port_id_a: PortId, port_id_b: PortId, are_connected: bool) {
-        eprintln!("EVENT: ports_connected {}, {}, {}", port_id_a, port_id_b, are_connected);
+    fn ports_connected(
+        &mut self,
+        _: &jack::Client,
+        port_id_a: PortId,
+        port_id_b: PortId,
+        are_connected: bool,
+    ) {
+        eprintln!(
+            "EVENT: ports_connected {}, {}, {}",
+            port_id_a, port_id_b, are_connected
+        );
         let mut model = self.model.lock().unwrap();
         if are_connected {
             model.update(Event::AddConnection(port_id_b, port_id_a));
