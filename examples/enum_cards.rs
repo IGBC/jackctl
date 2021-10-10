@@ -1,9 +1,5 @@
 use alsa::pcm::{HwParams, PCM};
 use alsa::Direction;
-use std::env;
-use std::fs;
-use std::process::abort;
-
 use regex::Regex;
 use std::env;
 use std::ffi::CString;
