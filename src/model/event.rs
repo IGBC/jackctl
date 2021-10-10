@@ -1,7 +1,7 @@
 //! Event types used for controlling the Model.
 
+use super::{JackPortType, Port};
 use crate::mixer::{CardId, ChannelId, Volume};
-use super::{Port, JackPortType};
 
 /// Event type represents methods that can be called on the model.
 pub enum Event {
@@ -22,9 +22,9 @@ pub enum Event {
     AddMidiOutput(Port),
 
     // Called when its time to delete a port,
-    // 'Argument is port ID 
+    // 'Argument is port ID
     DelPort(JackPortType),
-    
+
     AddConnection(JackPortType, JackPortType),
     DelConnection(JackPortType, JackPortType),
 }

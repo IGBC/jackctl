@@ -13,7 +13,6 @@ pub struct Card {
     pub state: CardStatus,
 }
 
-
 /// Defines all the state a card can be in
 #[derive(Clone, Debug, PartialEq)]
 pub enum CardStatus {
@@ -29,9 +28,9 @@ pub enum CardStatus {
     DontUse,
 }
 
-/// Struct representing a mixer channel in the model. 
+/// Struct representing a mixer channel in the model.
 /// A mixer channel is a typically a volume slider and a mute switch exposed
-/// as by ALSA. 
+/// as by ALSA.
 #[derive(Debug, PartialEq)]
 pub struct MixerChannel {
     pub id: u32,
