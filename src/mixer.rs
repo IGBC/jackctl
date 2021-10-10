@@ -1,15 +1,11 @@
-use gtk::prelude::*;
-
+use crate::model::{Card, CardConfig, CardStatus, Event, MixerChannel, Model};
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Mixer, Selem, SelemChannelId};
-
 use alsa::pcm::{HwParams, PCM};
 use alsa::Direction;
-
+use gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use crate::model::{CardConfig, CardStatus, Event, Model};
 
 pub struct MixerController {
     model: Model,
@@ -51,43 +47,52 @@ impl MixerController {
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
-                self.model.lock().unwrap().update(Event::AddCard(
-                    alsa_card.get_index(),
-                    alsa_card.get_name().unwrap(),
-                ));
+                self.model
+                    .lock()
+                    .unwrap()
+                    .get_pipe()
+                    .send(Event::AddCard(
+                        alsa_card.get_index(),
+                        alsa_card.get_name().unwrap(),
+                    ))
+                    .unwrap();
             }
         }
 
-        for card in self.model.lock().unwrap().cards.values_mut() {
+        let model = self.model.lock().unwrap();
+        let keys: Vec<&Card> = model.cards.values().collect();
+        for card in keys.iter() {
             // todo map this into a proper match statement
             match card.state {
                 CardStatus::Enum => {
-                    match self.attempt_capture_enumerate(card.id) {
+                    let inputs = match self.attempt_capture_enumerate(card.id) {
                         Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.inputs = Some(CardConfig {
+                            Some(CardConfig {
                                 sample_rate: rate,
                                 channels,
-                            });
+                            })
                         }
-                        _ => (),
-                    }
+                        _ => None,
+                    };
 
-                    match self.attempt_playback_enumerate(card.id) {
+                    let outputs = match self.attempt_playback_enumerate(card.id) {
                         Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.outputs = Some(CardConfig {
+                            Some(CardConfig {
                                 sample_rate: rate,
                                 channels,
-                            });
+                            })
                         }
-                        _ => (),
-                    }
+                        _ => None,
+                    };
 
-                    if card.inputs.is_some() || card.outputs.is_some() {
+                    if inputs.is_some() || outputs.is_some() {
                         // this is the old mixer enumeration code, but we're only running it once.
                         // pray that cards do not dynamically change their mixer interfaces.
                         let mixer = Mixer::new(&format!("hw:{}", card.id), false).unwrap();
+
+                        let mut channels: Vec<MixerChannel> = Vec::new();
 
                         for (id, channel) in mixer.iter().enumerate() {
                             let id = id as u32;
@@ -98,7 +103,7 @@ impl MixerController {
 
                             if s.has_capture_volume() {
                                 let (volume_min, volume_max) = s.get_capture_volume_range();
-                                card.add_channel(
+                                let mc = MixerChannel::new(
                                     id,
                                     name,
                                     false,
@@ -106,10 +111,11 @@ impl MixerController {
                                     volume_min,
                                     volume_max,
                                 );
+                                channels.push(mc);
                             } else {
                                 if s.has_playback_volume() {
                                     let (volume_min, volume_max) = s.get_playback_volume_range();
-                                    card.add_channel(
+                                    let mc = MixerChannel::new(
                                         id,
                                         name,
                                         true,
@@ -117,46 +123,72 @@ impl MixerController {
                                         volume_min,
                                         volume_max,
                                     );
+                                    channels.push(mc);
                                 }
                             };
                         }
 
-                        card.state = CardStatus::Start;
+                        model
+                            .get_pipe()
+                            .send(Event::FinishEnumerateCard(
+                                card.id, inputs, outputs, channels,
+                            ))
+                            .unwrap();
                     } else {
                         println!("Failed to enumerate card {} - {}", card.id, card.name());
-                        card.state = CardStatus::EnumFailed;
+                        model
+                            .get_pipe()
+                            .send(Event::FailEnumerateCard(card.id))
+                            .unwrap();
                     }
                 }
-                CardStatus::Active => {
-                    let mixer = Mixer::new(&format!("hw:{}", card.id), false)
-                        .expect("Could not get mixer, card probably disconnected");
-
-                    for (id, elem) in mixer.iter().enumerate() {
-                        let selem = Selem::new(elem).unwrap();
-                        match card.channels.get_mut(&(id as u32)) {
-                            Some(channel) => {
-                                if channel.dirty {
-                                    if channel.has_switch {
-                                        Self::set_muting(
+                CardStatus::Active => match Mixer::new(&format!("hw:{}", card.id), false) {
+                    Ok(mixer) => {
+                        for (id, elem) in mixer.iter().enumerate() {
+                            let selem = Selem::new(elem).unwrap();
+                            match card.channels.get(&(id as u32)) {
+                                Some(channel) => {
+                                    if channel.dirty {
+                                        if channel.has_switch {
+                                            Self::set_muting(
+                                                channel.is_playback,
+                                                &selem,
+                                                channel.switch,
+                                            );
+                                        }
+                                        Self::set_volume(
                                             channel.is_playback,
                                             &selem,
-                                            channel.switch,
+                                            channel.volume,
                                         );
+                                        model
+                                            .get_pipe()
+                                            .send(Event::CleanChannel(card.id, channel.id))
+                                            .unwrap();
+                                    } else {
+                                        let sw = if channel.has_switch {
+                                            Self::get_muting(channel.is_playback, &selem)
+                                        } else {
+                                            false
+                                        };
+                                        let volume = Self::get_volume(channel.is_playback, &selem);
+                                        model
+                                            .get_pipe()
+                                            .send(Event::UpdateChannel(
+                                                card.id, channel.id, volume, sw,
+                                            ))
+                                            .unwrap();
                                     }
-                                    Self::set_volume(channel.is_playback, &selem, channel.volume);
-                                    channel.dirty = false;
-                                } else {
-                                    if channel.has_switch {
-                                        channel.switch =
-                                            Self::get_muting(channel.is_playback, &selem);
-                                    }
-                                    channel.volume = Self::get_volume(channel.is_playback, &selem);
                                 }
+                                None => (),
                             }
-                            None => (),
                         }
                     }
-                }
+                    Err(e) => {
+                        eprintln!("Could not get mixer for card {}: {}", card.id, e);
+                        model.get_pipe().send(Event::StopCard(card.id)).unwrap();
+                    }
+                },
                 _ => {
                     // Card is in a state that mixer doesn't need to worry about
                 }

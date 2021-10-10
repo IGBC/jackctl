@@ -137,7 +137,12 @@ impl MainDialog {
         let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
         let state_clone = state.clone();
         xruns_icon.connect_clicked(move |icon| {
-            state_clone.lock().unwrap().update(Event::ResetXruns);
+            state_clone
+                .lock()
+                .unwrap()
+                .get_pipe()
+                .send(Event::ResetXruns)
+                .unwrap();
             icon.hide();
         });
 
@@ -317,7 +322,11 @@ impl MainDialog {
         // get the elements in order.
         let mut keys: Vec<&i32> = model.cards.keys().collect();
         keys.sort();
-        for card in keys.iter().map(|k| model.cards.get(*k).unwrap()) {
+        for card in keys
+            .iter()
+            .map(|k| model.cards.get(*k).unwrap())
+            .filter(|x| x.state == CardStatus::Active)
+        {
             let len = card.len();
             if len == 0 {
                 grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
@@ -445,7 +454,7 @@ impl MainDialog {
             }
         }
 
-        for card in model.cards.values_mut() {
+        for card in model.cards.values() {
             if card.state == CardStatus::New {
                 if self.card_dialog.lock().unwrap().is_none() {
                     eprintln!("asking for card {}", card.id);
@@ -465,10 +474,20 @@ impl MainDialog {
                         eprintln!("response recieved");
                         match response {
                             ResponseType::Yes => {
-                                model.lock().unwrap().update(Event::UseCard(id_clone))
+                                model
+                                    .lock()
+                                    .unwrap()
+                                    .get_pipe()
+                                    .send(Event::UseCard(id_clone))
+                                    .unwrap();
                             }
                             ResponseType::No => {
-                                model.lock().unwrap().update(Event::DontUseCard(id_clone))
+                                model
+                                    .lock()
+                                    .unwrap()
+                                    .get_pipe()
+                                    .send(Event::DontUseCard(id_clone))
+                                    .unwrap();
                             }
                             _ => panic!("Unexpected Message Response"),
                         }
@@ -517,7 +536,9 @@ impl MainDialog {
             model
                 .lock()
                 .unwrap()
-                .update(Event::SetMuting(card_id, channel, cb.get_active()));
+                .get_pipe()
+                .send(Event::SetMuting(card_id, channel, cb.get_active()))
+                .unwrap();
         });
         (button, signal_id)
     }
@@ -543,7 +564,9 @@ impl MainDialog {
             model
                 .lock()
                 .unwrap()
-                .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
+                .get_pipe()
+                .send(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
+                .unwrap()
         });
 
         let s = ScaleBuilder::new()

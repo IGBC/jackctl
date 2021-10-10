@@ -1,16 +1,15 @@
 //! Jackctl's Model and Event to drive the applications's MVC pattern
-use std::sync::{Arc, Mutex};
-
+use gdk::prelude::*;
 use std::collections::HashMap;
+use std::sync::{mpsc, Arc, Mutex};
 
 mod card;
 mod event;
 mod port;
 
 pub use card::*;
-pub use port::*;
-
 pub use event::Event;
+pub use port::*;
 
 /// Wrapper around a Mutexed Copy of the Model,
 /// use this instead of the model directly to
@@ -21,6 +20,9 @@ pub type Model = Arc<Mutex<ModelInner>>;
 /// you Should only ever make one of these and pass
 /// mutexed references around to it.
 pub struct ModelInner {
+    tx: mpsc::Sender<Event>,
+    rx: mpsc::Receiver<Event>,
+
     ixruns: u32,
     pub layout_dirty: bool,
 
@@ -42,7 +44,11 @@ impl ModelInner {
     /// Returns a new model, in default state. Don't assume
     /// anything is configured or initialised in this constructor.   
     pub fn new() -> Model {
-        Arc::new(Mutex::new(ModelInner {
+        let (tx, rx) = mpsc::channel::<Event>();
+        let model = Arc::new(Mutex::new(ModelInner {
+            tx,
+            rx,
+
             ixruns: 0,
             layout_dirty: true,
             cpu_percent: 0.0,
@@ -57,58 +63,172 @@ impl ModelInner {
             connections: Vec::new(),
 
             cards: HashMap::new(),
-        }))
+        }));
+
+        let model_clone = model.clone();
+        glib::timeout_add_local(1, move || {
+            model_clone.lock().unwrap().update();
+            Continue(true)
+        });
+        model
     }
 
-    pub fn update(&mut self, evt: Event) {
-        match evt {
-            Event::XRun => self.increment_xruns(),
-            Event::ResetXruns => self.reset_xruns(),
+    pub fn get_pipe(&self) -> mpsc::Sender<Event> {
+        self.tx.clone()
+    }
 
-            Event::AddCard(id, name) => {
-                self.card_detected(id, name);
-                self.layout_dirty = true;
-            }
-            Event::UseCard(id) => {
-                match self.cards.get_mut(&id) {
-                    Some(card) => card.state = CardStatus::Enum,
-                    None => eprintln!("Attempting to use non existing card {}", id),
-                };
-            }
-            Event::DontUseCard(id) => {
-                match self.cards.get_mut(&id) {
-                    Some(card) => card.state = CardStatus::DontUse,
-                    None => eprintln!("Attempting to ignore non existing card {}", id),
-                };
-            }
+    fn update(&mut self) {
+        loop {
+            let evt = match self.rx.try_recv() {
+                Ok(e) => e,
+                Err(_) => {
+                    return;
+                }
+            };
 
-            Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
-            Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
+            match evt {
+                Event::XRun => self.increment_xruns(),
+                Event::ResetXruns => self.reset_xruns(),
 
-            Event::AddAudioInput(i) => {
-                self.audio_inputs.add(i);
-                self.layout_dirty = true;
-            }
-            Event::AddAudioOutput(o) => {
-                self.audio_outputs.add(o);
-                self.layout_dirty = true;
-            }
-            Event::AddMidiInput(i) => {
-                self.midi_inputs.add(i);
-                self.layout_dirty = true;
-            }
-            Event::AddMidiOutput(o) => {
-                self.midi_outputs.add(o);
-                self.layout_dirty = true;
-            }
+                Event::AddCard(id, name) => {
+                    self.card_detected(id, name);
+                    self.layout_dirty = true;
+                }
 
-            Event::DelPort(id) => {
-                self.del_port(id);
-                self.layout_dirty = true;
-            }
+                Event::UseCard(id) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => card.state = CardStatus::Enum,
+                        None => eprintln!("Attempting to use non existing card {}", id),
+                    };
+                }
 
-            Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
-            Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
+                Event::DontUseCard(id) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => card.state = CardStatus::DontUse,
+                        None => eprintln!("Attempting to ignore non existing card {}", id),
+                    };
+                }
+
+                Event::FinishEnumerateCard(id, inputs, outputs, channels) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => {
+                            card.inputs = inputs;
+                            card.outputs = outputs;
+                            for channel in channels {
+                                card.add_channel(channel);
+                            }
+                            card.state = CardStatus::Start;
+                        }
+                        None => {
+                            eprintln!("Attempting to sync enumeration of non existing card {}", id)
+                        }
+                    };
+                }
+
+                Event::FinishStartCard(id, client_handle) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => {
+                            card.client_handle = Some(client_handle);
+                            card.state = CardStatus::Active;
+                        }
+                        None => eprintln!(
+                            "Attempting to sync client handle of non existing card {}",
+                            id
+                        ),
+                    };
+                }
+
+                Event::FailEnumerateCard(id) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => {
+                            card.state = CardStatus::EnumFailed;
+                        }
+                        None => eprintln!("Attempting to fail non existing card {}", id),
+                    };
+                }
+
+                Event::FailStartCard(id) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => {
+                            card.state = CardStatus::StartFailed;
+                        }
+                        None => eprintln!("Attempting to fail non existing card {}", id),
+                    };
+                }
+
+                Event::StopCard(id) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => card.state = CardStatus::Stopping,
+                        None => eprintln!("Attempting to stop non existing card {}", id),
+                    };
+                }
+                Event::ForgetCard(id) => {
+                    self.cards.remove(&id);
+                }
+
+                Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
+                Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
+
+                Event::UpdateChannel(id, ch, v, m) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => match card.channels.get_mut(&ch) {
+                            Some(channel) => {
+                                channel.volume = v;
+                                channel.switch = m;
+                            }
+                            None => eprintln!(
+                                "Attempting to update non existing channel {} on card {}",
+                                ch, id
+                            ),
+                        },
+                        None => {
+                            eprintln!("Attempting to update channel on non existing card {}", id)
+                        }
+                    };
+                }
+
+                Event::CleanChannel(id, ch) => {
+                    match self.cards.get_mut(&id) {
+                        Some(card) => match card.channels.get_mut(&ch) {
+                            Some(channel) => {
+                                channel.dirty = false;
+                            }
+                            None => eprintln!(
+                                "Attempting to clean non existing channel {} on card {}",
+                                ch, id
+                            ),
+                        },
+                        None => {
+                            eprintln!("Attempting to clean channel on non existing card {}", id)
+                        }
+                    };
+                }
+
+                Event::AddAudioInput(i) => {
+                    self.audio_inputs.add(i);
+                    self.layout_dirty = true;
+                }
+                Event::AddAudioOutput(o) => {
+                    self.audio_outputs.add(o);
+                    self.layout_dirty = true;
+                }
+                Event::AddMidiInput(i) => {
+                    self.midi_inputs.add(i);
+                    self.layout_dirty = true;
+                }
+                Event::AddMidiOutput(o) => {
+                    self.midi_outputs.add(o);
+                    self.layout_dirty = true;
+                }
+
+                Event::DelPort(id) => {
+                    self.del_port(id);
+                    self.layout_dirty = true;
+                }
+
+                Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
+                Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
+            }
         }
     }
 

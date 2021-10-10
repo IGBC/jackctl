@@ -1,10 +1,9 @@
 use crate::model::Model;
-use gtk::prelude::*;
 use psutil::process;
 use std::cell::RefCell;
 use std::panic;
 use std::process::abort;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
@@ -47,8 +46,8 @@ impl ProcessManager {
             let jack_proc = Command::new("jackd")
                 // This magic incantation launches jack with no input or output ports at all
                 .args(["-r", "-d", "dummy", "-C", "0", "-P", "0"].iter())
-                // .stdout(Stdio::piped())
-                // .stderr(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .spawn()
                 .expect("Failed to start jack server");
 
@@ -62,17 +61,8 @@ impl ProcessManager {
 
         let this = Rc::new(RefCell::new(Self { jack_process }));
 
-        let this_clone = this.clone();
-
-        glib::timeout_add_local(200, move || {
-            this_clone.borrow_mut().update_processes();
-            Continue(true)
-        });
-
         this
     }
-
-    fn update_processes(&mut self) {}
 
     pub fn end(&mut self) {
         let _ = match &mut self.jack_process {

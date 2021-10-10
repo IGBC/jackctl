@@ -6,6 +6,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Card {
     pub id: i32,
+    pub client_handle: Option<u64>,
     pub inputs: Option<CardConfig>, // option contains best sample rate
     pub outputs: Option<CardConfig>, // option contains best sample rate
     name: String,
@@ -24,6 +25,8 @@ pub enum CardStatus {
     Start,
     /// this card is in use
     Active,
+    /// This card should be stopped ASAP
+    Stopping,
     /// This card was just stopped, it should be put back into new in a few seconds
     Stopped,
     /// This card could not be enumerated, we are going to leave it alone
@@ -62,6 +65,27 @@ pub struct MixerChannel {
 }
 
 impl MixerChannel {
+    pub fn new(
+        id: u32,
+        name: String,
+        is_playback: bool,
+        has_switch: bool,
+        volume_min: i64,
+        volume_max: i64,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            is_playback,
+            has_switch,
+            volume_min,
+            volume_max,
+            volume: 0,
+            switch: false,
+            dirty: false,
+        }
+    }
+
     pub fn get_name(&self) -> &str {
         &self.name
     }
@@ -95,6 +119,7 @@ impl Card {
     pub fn new(id: i32, name: String) -> Self {
         Card {
             id,
+            client_handle: None,
             inputs: None,
             outputs: None,
             name,
@@ -103,27 +128,8 @@ impl Card {
         }
     }
 
-    pub fn add_channel(
-        &mut self,
-        id: u32,
-        name: String,
-        is_playback: bool,
-        has_switch: bool,
-        volume_min: i64,
-        volume_max: i64,
-    ) {
-        let channel = MixerChannel {
-            id,
-            name,
-            is_playback,
-            has_switch,
-            volume_min,
-            volume_max,
-            volume: 0,
-            switch: false,
-            dirty: false,
-        };
-        self.channels.insert(id, channel);
+    pub fn add_channel(&mut self, channel: MixerChannel) {
+        self.channels.insert(channel.id, channel);
     }
 
     pub fn name(&self) -> &str {
