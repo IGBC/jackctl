@@ -119,9 +119,6 @@ fn main() {
 
                         match mat_ch {
                             Some(caps) => {
-                                let path = entry.path();
-                                let path_str = path.to_str().unwrap();
-
                                 let card = format!("hw:{},{}", &caps["card"], &caps["dev"]);
 
                                 let alsa_card = alsa::card::Card::from_str(

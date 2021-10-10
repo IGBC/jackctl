@@ -1,22 +1,16 @@
+use crate::model::Model;
+use gtk::prelude::*;
 use psutil::process;
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io;
 use std::panic;
 use std::process::abort;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command};
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
 
-use gtk::prelude::*;
-
-use crate::model::Model;
-use crate::model::{Card, CardStatus};
-
 pub struct ProcessManager {
     jack_process: Option<Child>,
-    model: Model,
 }
 
 static mut MUT_JACKCTL_SPAWNED_SERVER: bool = false;
@@ -40,7 +34,7 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
 }
 
 impl ProcessManager {
-    pub fn new(model: Model) -> Rc<RefCell<Self>> {
+    pub fn new(_model: Model) -> Rc<RefCell<Self>> {
         panic::set_hook(Box::new(|pi| {
             panic_kill(pi);
         }));
@@ -66,10 +60,7 @@ impl ProcessManager {
             Some(jack_proc)
         };
 
-        let this = Rc::new(RefCell::new(Self {
-            jack_process,
-            model,
-        }));
+        let this = Rc::new(RefCell::new(Self { jack_process }));
 
         let this_clone = this.clone();
 
@@ -81,9 +72,7 @@ impl ProcessManager {
         this
     }
 
-    fn update_processes(&mut self) {
-        let model = self.model.clone();
-    }
+    fn update_processes(&mut self) {}
 
     pub fn end(&mut self) {
         let _ = match &mut self.jack_process {

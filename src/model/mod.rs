@@ -69,6 +69,19 @@ impl ModelInner {
                 self.card_detected(id, name);
                 self.layout_dirty = true;
             }
+            Event::UseCard(id) => {
+                match self.cards.get_mut(&id) {
+                    Some(card) => card.state = CardStatus::Enum,
+                    None => eprintln!("Attempting to use non existing card {}", id),
+                };
+            }
+            Event::DontUseCard(id) => {
+                match self.cards.get_mut(&id) {
+                    Some(card) => card.state = CardStatus::DontUse,
+                    None => eprintln!("Attempting to ignore non existing card {}", id),
+                };
+            }
+
             Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
             Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
 

@@ -11,6 +11,10 @@ pub enum Event {
     ResetXruns,
     /// Called when the Model detects a new card to add to the model
     AddCard(CardId, String),
+    /// Called to Start Enumating the Card
+    UseCard(CardId),
+    DontUseCard(CardId),
+
     /// Called when the user requests a mute operation on a channel
     SetMuting(CardId, ChannelId, bool),
     /// Called when the user requests a volume change on a channel

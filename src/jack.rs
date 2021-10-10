@@ -1,6 +1,6 @@
 //! Jackctl's connection to the JACK server.
 
-use crate::model::{Event, JackPortType, Model, Port};
+use crate::model::{CardStatus, Event, JackPortType, Model, Port};
 use gtk::prelude::*;
 use jack::Client as JackClient;
 use jack::Error as JackError;
@@ -110,13 +110,44 @@ impl JackController {
     /// Interogates the jack server for changes, that cannot be streamed as events, and submits
     /// them to the [Model](crate::model::ModelInner)
     pub fn interval_update(&mut self) {
-        let mut model = self.model.lock().unwrap();
-        let interface = self.interface.as_client();
-        model.cpu_percent = interface.cpu_load();
-        model.sample_rate = interface.sample_rate();
-        let frames = interface.buffer_size();
-        model.buffer_size = frames.into();
-        model.latency = (model.buffer_size) as u64 / (model.sample_rate as u64 / 1000u64) as u64;
+        {
+            let mut model = self.model.lock().unwrap();
+            let interface = self.interface.as_client();
+            model.cpu_percent = interface.cpu_load();
+            model.sample_rate = interface.sample_rate();
+            let frames = interface.buffer_size();
+            model.buffer_size = frames.into();
+            model.latency =
+                (model.buffer_size) as u64 / (model.sample_rate as u64 / 1000u64) as u64;
+        }
+
+        for card in self.model.lock().unwrap().cards.values_mut() {
+            match card.state {
+                CardStatus::Start => {
+                    let id = format!("hw:{}", card.id);
+                    let result = self.launch_card(
+                        &id,
+                        card.name(),
+                        card.inputs.unwrap_or(0),
+                        card.outputs.unwrap_or(0),
+                        2,
+                        0,
+                    );
+                    match result {
+                        Ok(id) => {
+                            card.state = CardStatus::Active;
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to start card {}: {}", card.name(), e);
+                            card.state = CardStatus::StartFailed;
+                        }
+                    }
+                }
+                _ => {
+                    // Don't need to worry about these cards.
+                }
+            }
+        }
     }
 
     fn filter_ports(&self, ports: Vec<String>) -> Vec<String> {
@@ -140,24 +171,23 @@ impl JackController {
     }
 
     fn launch_card(
-        &mut self,
+        &self,
         id: &str,
         name: &str,
         in_ports: u32,
         out_ports: u32,
         nperiods: u32,
         quality: u32,
-    ) -> Result<(), jack::Error> {
+    ) -> Result<InternalClientID, jack::Error> {
         let client = self.interface.as_client();
         let rate = client.sample_rate();
         let psize = client.buffer_size();
         let args = format!(
-            "-d {} -r {} -p {} -n {} -i {} -o {} -q {}",
-            id, rate, psize, nperiods, in_ports, out_ports, quality
+            "-d {} -r {} -p {} -n {} -q {}",
+            id, rate, psize, nperiods, quality
         );
-        let result = client.load_internal_client(name, "audioadapter", &args)?;
-        self.cards.insert(id.to_owned(), result);
-        Ok(())
+        eprintln!("running audioadapter with: {}", args);
+        client.load_internal_client(name, "audioadapter", &args)
     }
 
     fn recover_card(&mut self, id: &str) -> bool {

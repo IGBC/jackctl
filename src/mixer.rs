@@ -60,7 +60,7 @@ impl MixerController {
         for card in self.model.lock().unwrap().cards.values_mut() {
             // todo map this into a proper match statement
             match card.state {
-                CardStatus::New => {
+                CardStatus::Enum => {
                     match self.attempt_capture_enumerate(card.id) {
                         Ok(rates) => {
                             let rate = self.pick_best_rate(&rates);
@@ -114,14 +114,15 @@ impl MixerController {
                             };
                         }
 
-                        card.state = CardStatus::Active;
+                        card.state = CardStatus::Start;
                     } else {
                         println!("Failed to enumerate card {} - {}", card.id, card.name());
                         card.state = CardStatus::EnumFailed;
                     }
                 }
                 CardStatus::Active => {
-                    let mixer = Mixer::new(&format!("hw:{}", card.id), false).unwrap();
+                    let mixer = Mixer::new(&format!("hw:{}", card.id), false)
+                        .expect("Could not get mixer, card probably disconnected");
 
                     for (id, elem) in mixer.iter().enumerate() {
                         let selem = Selem::new(elem).unwrap();
@@ -149,11 +150,8 @@ impl MixerController {
                         }
                     }
                 }
-                CardStatus::EnumFailed => {
-                    // we ignore this card
-                }
                 _ => {
-                    panic!("unexpected card SM");
+                    // Card is in a state that mixer doesn't need to worry about
                 }
             }
         }
@@ -249,133 +247,3 @@ impl MixerController {
         }
     }
 }
-
-// impl Card {
-//     pub fn new(id: i32, name: String) -> Option<Self> {
-//         let mut playback_rates:Vec<u32> = Vec::new();
-//         let mut capture_rates:Vec<u32> = Vec::new();
-
-//         match PCM::new(&format!("hw:{}", id), Direction::Playback, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//             Ok(pcm) => {
-//                 // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//                 let hwp = HwParams::any(&pcm).unwrap();
-//                 println!("    Playback channels: {}, {}", hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap());
-//                 //,         hwp.get_channels().unwrap());
-//                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in SAMPLE_RATES.iter() {
-//                 for rate in SAMPLE_RATES.iter() {
-//                     match hwp.test_rate(*rate) {
-//                         Ok(()) => {
-//                             println!("        {}: Ok", rate);
-//                             playback_rates.push(*rate);
-//                         },
-//                         Err(_) => (),
-//                     };
-//                 }
-//             },
-//             Err(e) => {
-//                 println!("   Playback - cannot open card: {}", e);
-//             }
-//         }
-
-//         match PCM::new(&format!("hw:{}", id), Direction::Capture, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//             Ok(pcm) => {
-//                 // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//                 let hwp = HwParams::any(&pcm).unwrap();
-//                 println!("    Capture channels: {}, {}", hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap());
-//                 //,         hwp.get_channels().unwrap());
-//                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in SAMPLE_RATES.iter() {
-//                 for rate in SAMPLE_RATES.iter() {
-//                     match hwp.test_rate(*rate) {
-//                         Ok(()) => {
-//                             println!("        {}: Ok", rate);
-//                             capture_rates.push(*rate);
-//                         },
-//                         Err(_) => (),
-//                     };
-//                 }
-//             },
-//             Err(e) => {
-//                 println!("   Capture - cannot open card: {}", e);
-//             }
-//         }
-
-// for a in ::alsa::card::Iter::new().map(|x| x.unwrap()) {
-//     // Open default playback device
-//     //&format!("hw:{}", a.get_index());
-//     println!("hw:{} {}", a.get_index(), a.get_name().unwrap());
-//     match PCM::new(&format!("hw:{}", a.get_index()), Direction::Playback, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//         Ok(pcm) => {
-//             // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//             let hwp = HwParams::any(&pcm).unwrap();
-//             println!(
-//                 "    Playback channels: {}, {}",
-//                 hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap()
-//             );
-//             //,         hwp.get_channels().unwrap());
-//             hwp.set_rate_resample(true).unwrap();
-//             //for rate in SAMPLE_RATES.iter() {
-//             for rate in SAMPLE_RATES.iter() {
-//                 match hwp.test_rate(*rate) {
-//                     Ok(()) => println!("        {}: Ok", rate),
-//                     Err(_) => (),
-//                 };
-//             }
-//         }
-//         Err(e) => {
-//             println!("   Playback - cannot open card: {}", e);
-//         }
-//     }
-
-//     match PCM::new(&format!("hw:{}", a.get_index()), Direction::Capture, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//         Ok(pcm) => {
-//             // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//             let hwp = HwParams::any(&pcm).unwrap();
-//             println!(
-//                 "    Capture channels: {}, {}",
-//                 hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap()
-//             );
-//             //,         hwp.get_channels().unwrap());
-//             hwp.set_rate_resample(true).unwrap();
-//             //for rate in SAMPLE_RATES.iter() {
-//             for rate in 1..40000000 {
-//                 match hwp.test_rate(rate) {
-//                     Ok(()) => println!("        {}: Ok", rate),
-//                     Err(_) => (),
-//                 };
-//             }
-//         }
-//         Err(e) => {
-//             println!("   Capture - cannot open card: {}", e);
-//         }
-//     }
-
-// use std::ffi::CString;
-// use alsa::hctl::HCtl;
-// let h = HCtl::open(&CString::new(format!("hw:{}", a.get_index())).unwrap(), false).unwrap();
-// h.load().unwrap();
-// for b in h.elem_iter() {
-//     use alsa::ctl::ElemIface;
-//     let id = b.get_id().unwrap();
-//     let name = id.get_name().unwrap();
-//     let value = b.read().unwrap();
-//     println!("hw:{} {} = {:?}", a.get_index(), &name, value);
-
-//     if !name.ends_with(" Jack") { continue; }
-//     if name.ends_with(" Phantom Jack") {
-//         println!("{} is always present", &name[..name.len()-13])
-//     }
-//     else { println!("{} is {}", &name[..name.len()-5],
-//         if b.read().unwrap().get_boolean(0).unwrap() { "plugged in" } else { "unplugged" })
-//     }
-// }
-// }
