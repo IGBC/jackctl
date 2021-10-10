@@ -9,7 +9,7 @@ use alsa::Direction;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::model::{CardStatus, Event, Model};
+use crate::model::{CardConfig, CardStatus, Event, Model};
 
 pub struct MixerController {
     model: Model,
@@ -24,6 +24,7 @@ pub type CardId = i32;
 pub type ChannelId = u32;
 pub type Volume = i64;
 pub type SampleRate = u32;
+pub type ChannelCount = u32;
 
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
@@ -62,17 +63,23 @@ impl MixerController {
             match card.state {
                 CardStatus::Enum => {
                     match self.attempt_capture_enumerate(card.id) {
-                        Ok(rates) => {
+                        Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.inputs = Some(rate);
+                            card.inputs = Some(CardConfig {
+                                sample_rate: rate,
+                                channels,
+                            });
                         }
                         _ => (),
                     }
 
                     match self.attempt_playback_enumerate(card.id) {
-                        Ok(rates) => {
+                        Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.outputs = Some(rate);
+                            card.outputs = Some(CardConfig {
+                                sample_rate: rate,
+                                channels,
+                            });
                         }
                         _ => (),
                     }
@@ -157,34 +164,44 @@ impl MixerController {
         }
     }
 
-    fn attempt_playback_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
+    fn attempt_playback_enumerate(
+        &self,
+        card: CardId,
+    ) -> alsa::Result<(Vec<SampleRate>, ChannelCount)> {
         // Open playback device
-        let mut results = Vec::new();
+        let mut rates = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Playback, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
         for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
-                Ok(()) => results.push(*rate),
+                Ok(()) => rates.push(*rate),
                 Err(_) => (),
             }
         }
-        Ok(results)
+
+        let channels = hwp.get_channels_max().unwrap();
+        Ok((rates, channels))
     }
 
-    fn attempt_capture_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
+    fn attempt_capture_enumerate(
+        &self,
+        card: CardId,
+    ) -> alsa::Result<(Vec<SampleRate>, ChannelCount)> {
         // Open capture device
-        let mut results = Vec::new();
+        let mut rates = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Capture, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
         for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
-                Ok(()) => results.push(*rate),
+                Ok(()) => rates.push(*rate),
                 Err(_) => (),
             }
         }
-        Ok(results)
+
+        let channels = hwp.get_channels_max().unwrap();
+        Ok((rates, channels))
     }
 
     fn pick_best_rate(&self, rates: &Vec<SampleRate>) -> SampleRate {

@@ -8,10 +8,10 @@ use jack::InternalClientID;
 use jack::Port as JackPort;
 use jack::{AsyncClient, NotificationHandler, PortFlags, PortId, Unowned};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
+
 enum PortType {
     Audio,
     Midi,
@@ -31,7 +31,6 @@ pub struct JackNotificationController {
 pub struct JackController {
     model: Model,
     interface: AsyncClient<JackNotificationController, ()>,
-    cards: HashMap<String, InternalClientID>,
 }
 
 impl JackController {
@@ -56,11 +55,7 @@ impl JackController {
 
         let interface = client.activate_async(async_controller, ()).unwrap();
 
-        let this = Rc::new(RefCell::new(Self {
-            model,
-            interface,
-            cards: HashMap::new(),
-        }));
+        let this = Rc::new(RefCell::new(Self { model, interface }));
 
         this.borrow_mut().interval_update();
         let this_clone = this.clone();
@@ -125,14 +120,19 @@ impl JackController {
             match card.state {
                 CardStatus::Start => {
                     let id = format!("hw:{}", card.id);
-                    let result = self.launch_card(
-                        &id,
-                        card.name(),
-                        card.inputs.unwrap_or(0),
-                        card.outputs.unwrap_or(0),
-                        2,
-                        0,
-                    );
+                    let inputs = match &card.inputs {
+                        Some(cc) => cc.channels,
+                        None => 0,
+                    };
+                    let outputs = match &card.outputs {
+                        Some(cc) => cc.channels,
+                        None => 0,
+                    };
+                    let rate = match &card.outputs {
+                        Some(cc) => cc.sample_rate,
+                        None => 0,
+                    };
+                    let result = self.launch_card(&id, card.name(), rate, inputs, outputs, 2, 0);
                     match result {
                         Ok(id) => {
                             card.state = CardStatus::Active;
@@ -150,55 +150,29 @@ impl JackController {
         }
     }
 
-    fn filter_ports(&self, ports: Vec<String>) -> Vec<String> {
-        let mut hard_ports = Vec::new();
-        let mut soft_ports = Vec::new();
-
-        for i in ports.iter() {
-            let g: &str = i.split(':').collect::<Vec<&str>>()[0];
-            if g.ends_with(" - Outputs") || g.ends_with(" - Inputs") {
-                hard_ports.push(i.clone());
-            } else {
-                if g != "system" {
-                    soft_ports.push(i.clone());
-                }
-            }
-        }
-
-        let mut out = hard_ports;
-        out.append(&mut soft_ports);
-        out
-    }
-
     fn launch_card(
         &self,
         id: &str,
         name: &str,
+        rate: u32,
         in_ports: u32,
         out_ports: u32,
         nperiods: u32,
         quality: u32,
     ) -> Result<InternalClientID, jack::Error> {
         let client = self.interface.as_client();
-        let rate = client.sample_rate();
         let psize = client.buffer_size();
         let args = format!(
-            "-d {} -r {} -p {} -n {} -q {}",
-            id, rate, psize, nperiods, quality
+            "-d {} -r {} -p {} -n {} -q {} -i {} -o {}",
+            id, rate, psize, nperiods, quality, in_ports, out_ports
         );
         eprintln!("running audioadapter with: {}", args);
         client.load_internal_client(name, "audioadapter", &args)
     }
 
-    fn recover_card(&mut self, id: &str) -> bool {
-        let key = self.cards.get(id);
-        match key {
-            Some(id) => {
-                let result = self.interface.as_client().unload_internal_client(*id);
-                result.is_ok()
-            }
-            None => true,
-        }
+    fn recover_card(&mut self, id: InternalClientID) -> bool {
+        let result = self.interface.as_client().unload_internal_client(id);
+        result.is_ok()
     }
 }
 

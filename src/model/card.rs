@@ -6,8 +6,8 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Card {
     pub id: i32,
-    pub inputs: Option<u32>,  // option contains best sample rate
-    pub outputs: Option<u32>, // option contains best sample rate
+    pub inputs: Option<CardConfig>, // option contains best sample rate
+    pub outputs: Option<CardConfig>, // option contains best sample rate
     name: String,
     pub channels: HashMap<u32, MixerChannel>,
     pub state: CardStatus,
@@ -34,6 +34,12 @@ pub enum CardStatus {
     Busy,
     /// The user has told us not to use this card
     DontUse,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CardConfig {
+    pub sample_rate: u32,
+    pub channels: u32,
 }
 
 /// Struct representing a mixer channel in the model.
