@@ -6,14 +6,15 @@ mod process_manager;
 mod settings;
 mod ui;
 
-use directories::ProjectDirs;
 use gio::prelude::*;
 use std::env::args;
 
 fn main() {
     // Load and initialise settings first
-    let dir = ProjectDirs::from("tech", "sigsegv", "jackctl").unwrap();
-    let set = settings::Settings::init(dir.config_dir());
+    let dir = settings::scaffold();
+    let set = settings::Settings::init(dir.config_dir()).unwrap();
+
+    println!("{:?}", set.r().app());
 
     if gtk::init().is_err() {
         println!("Failed to start GTK, please ensure all dependancies are installed");
