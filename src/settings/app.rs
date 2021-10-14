@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// These settings modify the base behaviour of the application and
 /// user preferences.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AppSettings {
     /// How the UI opens initially
     pub ui_launch_mode: UiLaunchMode,
@@ -22,7 +22,7 @@ impl Default for AppSettings {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum UiLaunchMode {
     /// Open the setup wizard
     Wizard,

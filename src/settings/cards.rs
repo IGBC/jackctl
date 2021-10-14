@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 /// Remember audio devices previously configured with jackctl
 ///
 ///
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CardSettings {
     /// Store all known card settings
     pub known: BTreeMap<Id, SoundCard>,
@@ -14,7 +14,7 @@ pub struct CardSettings {
 }
 
 /// Encoding information about a single sound card
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SoundCard {
     pub name: String,
 }
