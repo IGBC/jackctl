@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Jack server settings
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct JackSettings {
+    /// Keep track of the version of this file
+    version: u8,
     /// Specify how the jack server is launched
     pub spawn_mode: SpawnMode,
     /// How should the jack server behave
@@ -19,7 +21,8 @@ impl Default for JackSettings {
     fn default() -> Self {
         // very controvertial default values
         Self {
-            spawn_mode: SpawnMode::SoftSpawnJack,
+            version: 1,
+            spawn_mode: SpawnMode::SoftSpawn,
             run_mode: RunMode::Uninitialized,
             realtime: false,
             block_size: 1024,
@@ -28,19 +31,17 @@ impl Default for JackSettings {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SpawnMode {
-    /// Only bridge Jack to pulse-audio
-    PaBridge,
     /// Wait for jack to be spawned
-    WaitForJack,
+    Wait,
     /// Attempt to spawn jack but fall back to existing servers
-    SoftSpawnJack,
+    SoftSpawn,
     /// Force spawn jack and kill competing servers
-    ForceSpawnJack,
+    ForceSpawn,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RunMode {
     /// This setting has not been initialised by the user yet
     Uninitialized,
