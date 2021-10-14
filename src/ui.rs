@@ -3,20 +3,21 @@
 //! Don't expect me to document this module. It will change with every tiny change to the GUI.
 
 use crate::jack::JackController;
-use crate::mixer::MixerController;
-use crate::model::{Event, MixerChannel, Model, ModelInner, Port, PortGroup};
+use crate::model::{CardStatus, Event, MixerChannel, Model, ModelInner, Port, PortGroup};
 use gio::prelude::*;
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
 use gtk::{
-    AboutDialog, Adjustment, Align, Application, Builder, Button, CheckButton, Grid, Label,
-    LevelBar, Notebook, Orientation, PositionType, Scale, ScaleBuilder, Separator, Window,
+    AboutDialog, Adjustment, Align, Application, Builder, Button, ButtonsType, CheckButton,
+    DialogFlags, Grid, Label, LevelBar, MessageDialog, MessageType, Notebook, Orientation,
+    PositionType, ResponseType, Scale, ScaleBuilder, Separator, Window,
 };
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 use std::cell::RefCell;
 use std::env;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 const STYLE: &str = include_str!("jackctl.css");
 const GLADEFILE: &str = include_str!("jackctl.glade");
@@ -31,7 +32,6 @@ struct MixerHandle {
 pub struct MainDialog {
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
-    alsa_controller: Rc<RefCell<MixerController>>,
 
     builder: Builder,
     window: Window,
@@ -47,6 +47,8 @@ pub struct MainDialog {
     audio_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
     midi_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
     mixer_handles: Vec<MixerHandle>,
+
+    card_dialog: Arc<Mutex<Option<MessageDialog>>>,
 }
 
 fn get_object<T>(builder: &Builder, name: &str) -> T
@@ -62,7 +64,6 @@ where
 pub fn init_ui(
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
-    alsa_controller: Rc<RefCell<MixerController>>,
 ) -> (Rc<RefCell<MainDialog>>, Application) {
     let icon_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
 
@@ -72,7 +73,7 @@ pub fn init_ui(
 
     //application.set_icon_theme_path(icon_path);
 
-    let this = MainDialog::new(state, jack_controller, alsa_controller);
+    let this = MainDialog::new(state, jack_controller);
     let win_clone = this.clone();
     application.connect_startup(move |app| {
         // The CSS "magic" happens here.
@@ -116,11 +117,7 @@ pub fn init_ui(
 }
 
 impl MainDialog {
-    pub fn new(
-        state: Model,
-        jack_controller: Rc<RefCell<JackController>>,
-        alsa_controller: Rc<RefCell<MixerController>>,
-    ) -> Rc<RefCell<Self>> {
+    pub fn new(state: Model, jack_controller: Rc<RefCell<JackController>>) -> Rc<RefCell<Self>> {
         // this builder provides access to all components of the defined ui
         let builder = Builder::from_string(GLADEFILE);
 
@@ -140,7 +137,12 @@ impl MainDialog {
         let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
         let state_clone = state.clone();
         xruns_icon.connect_clicked(move |icon| {
-            state_clone.lock().unwrap().update(Event::ResetXruns);
+            state_clone
+                .lock()
+                .unwrap()
+                .get_pipe()
+                .send(Event::ResetXruns)
+                .unwrap();
             icon.hide();
         });
 
@@ -167,7 +169,6 @@ impl MainDialog {
         let this = Rc::new(RefCell::new(MainDialog {
             state,
             jack_controller,
-            alsa_controller,
             builder: builder.clone(),
             window: window.clone(),
             xruns_label,
@@ -181,6 +182,7 @@ impl MainDialog {
             audio_matrix: Vec::new(),
             midi_matrix: Vec::new(),
             mixer_handles: Vec::new(),
+            card_dialog: Arc::new(Mutex::new(None)),
         }));
 
         // hookup the update function
@@ -320,7 +322,11 @@ impl MainDialog {
         // get the elements in order.
         let mut keys: Vec<&i32> = model.cards.keys().collect();
         keys.sort();
-        for card in keys.iter().map(|k| model.cards.get(*k).unwrap()) {
+        for card in keys
+            .iter()
+            .map(|k| model.cards.get(*k).unwrap())
+            .filter(|x| x.state == CardStatus::Active)
+        {
             let len = card.len();
             if len == 0 {
                 grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
@@ -448,6 +454,55 @@ impl MainDialog {
             }
         }
 
+        for card in model.cards.values() {
+            if card.state == CardStatus::New {
+                if self.card_dialog.lock().unwrap().is_none() {
+                    eprintln!("asking for card {}", card.id);
+                    let dialog = MessageDialog::new(
+                        Some(&self.window),
+                        DialogFlags::empty(),
+                        MessageType::Question,
+                        ButtonsType::YesNo,
+                        &format!("Use Card \"{}\"?", card.name()),
+                    );
+
+                    let model = self.state.clone();
+                    let dialog_ref = self.card_dialog.clone();
+                    let id_clone = card.id.clone();
+
+                    dialog.connect_response(move |dialog, response| {
+                        eprintln!("response recieved");
+                        match response {
+                            ResponseType::Yes => {
+                                model
+                                    .lock()
+                                    .unwrap()
+                                    .get_pipe()
+                                    .send(Event::UseCard(id_clone))
+                                    .unwrap();
+                            }
+                            ResponseType::No => {
+                                model
+                                    .lock()
+                                    .unwrap()
+                                    .get_pipe()
+                                    .send(Event::DontUseCard(id_clone))
+                                    .unwrap();
+                            }
+                            _ => panic!("Unexpected Message Response"),
+                        }
+                        dialog.hide();
+                        let _ = dialog_ref.lock().unwrap().take();
+                    });
+
+                    dialog.set_modal(true);
+                    dialog.show_all();
+
+                    self.card_dialog.lock().unwrap().replace(dialog);
+                }
+            }
+        }
+
         gtk::Inhibit(false)
     }
 
@@ -481,7 +536,9 @@ impl MainDialog {
             model
                 .lock()
                 .unwrap()
-                .update(Event::SetMuting(card_id, channel, cb.get_active()));
+                .get_pipe()
+                .send(Event::SetMuting(card_id, channel, cb.get_active()))
+                .unwrap();
         });
         (button, signal_id)
     }
@@ -507,7 +564,9 @@ impl MainDialog {
             model
                 .lock()
                 .unwrap()
-                .update(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
+                .get_pipe()
+                .send(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
+                .unwrap()
         });
 
         let s = ScaleBuilder::new()

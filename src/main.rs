@@ -27,16 +27,12 @@ fn main() {
 
     let proc_manager = process_manager::ProcessManager::new(model.clone());
     let jack_controller = jack::JackController::new(model.clone());
-    let alsa_controller = mixer::MixerController::new(model.clone());
-    let (window, app) = ui::init_ui(
-        model.clone(),
-        jack_controller.clone(),
-        alsa_controller.clone(),
-    );
+    let _alsa_controller = mixer::MixerController::new(model.clone());
+    let (window, app) = ui::init_ui(model.clone(), jack_controller.clone());
     window.borrow().show();
 
     app.run(&args().collect::<Vec<_>>());
     proc_manager.borrow_mut().end();
-
+    
     println!("Jackctl Exiting, Goodbye");
 }

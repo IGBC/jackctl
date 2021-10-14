@@ -1,9 +1,10 @@
 //! Jackctl's connection to the JACK server.
 
-use crate::model::{Event, JackPortType, Model, Port};
+use crate::model::{Card, CardStatus, Event, JackPortType, Model, Port};
 use gtk::prelude::*;
 use jack::Client as JackClient;
 use jack::Error as JackError;
+use jack::InternalClientID;
 use jack::Port as JackPort;
 use jack::{AsyncClient, NotificationHandler, PortFlags, PortId, Unowned};
 use std::cell::RefCell;
@@ -30,7 +31,6 @@ pub struct JackNotificationController {
 pub struct JackController {
     model: Model,
     interface: AsyncClient<JackNotificationController, ()>,
-    // async_interface: jack::AsyncClient<JackNotificationController, ()>,
 }
 
 impl JackController {
@@ -112,26 +112,83 @@ impl JackController {
         let frames = interface.buffer_size();
         model.buffer_size = frames.into();
         model.latency = (model.buffer_size) as u64 / (model.sample_rate as u64 / 1000u64) as u64;
-    }
 
-    fn filter_ports(&self, ports: Vec<String>) -> Vec<String> {
-        let mut hard_ports = Vec::new();
-        let mut soft_ports = Vec::new();
+        let keys: Vec<&Card> = model.cards.values().collect();
+        for card in keys.iter() {
+            match card.state {
+                CardStatus::Start => {
+                    let id = format!("hw:{}", card.id);
+                    let inputs = match &card.inputs {
+                        Some(cc) => cc.channels,
+                        None => 0,
+                    };
+                    let outputs = match &card.outputs {
+                        Some(cc) => cc.channels,
+                        None => 0,
+                    };
+                    let rate = match &card.outputs {
+                        Some(cc) => cc.sample_rate,
+                        None => 0,
+                    };
+                    let result = self.launch_card(&id, card.name(), rate, inputs, outputs, 2, 0);
+                    match result {
+                        Ok(id) => {
+                            model
+                                .get_pipe()
+                                .send(Event::FinishStartCard(card.id, id))
+                                .unwrap();
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to start card {}: {}", card.name(), e);
+                            model
+                                .get_pipe()
+                                .send(Event::FailStartCard(card.id))
+                                .unwrap();
+                        }
+                    }
+                }
 
-        for i in ports.iter() {
-            let g: &str = i.split(':').collect::<Vec<&str>>()[0];
-            if g.ends_with(" - Outputs") || g.ends_with(" - Inputs") {
-                hard_ports.push(i.clone());
-            } else {
-                if g != "system" {
-                    soft_ports.push(i.clone());
+                CardStatus::Stopping => {
+                    eprintln!("Stopping Card {}", card.id);
+                    match card.client_handle {
+                        Some(h) => self.stop_card(h),
+                        None => eprint!("Card {} was not running", card.id),
+                    }
+                    model.get_pipe().send(Event::ForgetCard(card.id)).unwrap();
+                }
+
+                _ => {
+                    // Don't need to worry about these cards.
                 }
             }
         }
+    }
 
-        let mut out = hard_ports;
-        out.append(&mut soft_ports);
-        out
+    fn launch_card(
+        &self,
+        id: &str,
+        name: &str,
+        rate: u32,
+        in_ports: u32,
+        out_ports: u32,
+        nperiods: u32,
+        quality: u32,
+    ) -> Result<InternalClientID, jack::Error> {
+        let client = self.interface.as_client();
+        let psize = client.buffer_size();
+        let args = format!(
+            "-d {} -r {} -p {} -n {} -q {} -i {} -o {}",
+            id, rate, psize, nperiods, quality, in_ports, out_ports
+        );
+        eprintln!("running audioadapter with: {}", args);
+        client.load_internal_client(name, "audioadapter", &args)
+    }
+
+    fn stop_card(&self, id: InternalClientID) {
+        let result = self.interface.as_client().unload_internal_client(id);
+        if result.is_err() {
+            eprintln!("Failed to Stop card: {}", result.unwrap_err());
+        }
     }
 }
 
@@ -184,7 +241,7 @@ impl NotificationHandler for JackNotificationController {
 
             let port = Port::new(port_id, name.clone());
 
-            let mut model = self.model.lock().unwrap();
+            let model = self.model.lock().unwrap();
 
             let pt = match self.identify_port(&jack_port) {
                 Ok(pt) => pt,
@@ -195,20 +252,26 @@ impl NotificationHandler for JackNotificationController {
             };
 
             match pt {
-                (PortType::Audio, PortDirection::Input) => model.update(Event::AddAudioInput(port)),
-                (PortType::Audio, PortDirection::Output) => {
-                    model.update(Event::AddAudioOutput(port))
+                (PortType::Audio, PortDirection::Input) => {
+                    model.get_pipe().send(Event::AddAudioInput(port)).unwrap()
                 }
-                (PortType::Midi, PortDirection::Input) => model.update(Event::AddMidiInput(port)),
-                (PortType::Midi, PortDirection::Output) => model.update(Event::AddMidiOutput(port)),
+                (PortType::Audio, PortDirection::Output) => {
+                    model.get_pipe().send(Event::AddAudioOutput(port)).unwrap()
+                }
+                (PortType::Midi, PortDirection::Input) => {
+                    model.get_pipe().send(Event::AddMidiInput(port)).unwrap()
+                }
+                (PortType::Midi, PortDirection::Output) => {
+                    model.get_pipe().send(Event::AddMidiOutput(port)).unwrap()
+                }
                 (PortType::Unknown(f), _) => {
                     println!("Unknown port format \"{}\" for port {}", f, name);
                     return;
                 }
             }
         } else {
-            let mut model = self.model.lock().unwrap();
-            model.update(Event::DelPort(port_id));
+            let model = self.model.lock().unwrap();
+            model.get_pipe().send(Event::DelPort(port_id)).unwrap();
         }
     }
 
@@ -238,18 +301,24 @@ impl NotificationHandler for JackNotificationController {
             "EVENT: ports_connected {}, {}, {}",
             port_id_a, port_id_b, are_connected
         );
-        let mut model = self.model.lock().unwrap();
+        let model = self.model.lock().unwrap();
         if are_connected {
-            model.update(Event::AddConnection(port_id_b, port_id_a));
+            model
+                .get_pipe()
+                .send(Event::AddConnection(port_id_b, port_id_a))
+                .unwrap();
         } else {
-            model.update(Event::DelConnection(port_id_b, port_id_a));
+            model
+                .get_pipe()
+                .send(Event::DelConnection(port_id_b, port_id_a))
+                .unwrap();
         }
     }
 
     fn xrun(&mut self, _: &jack::Client) -> jack::Control {
         eprintln!("EVENT: XRun");
-        let mut model = self.model.lock().unwrap();
-        model.update(Event::XRun);
+        let model = self.model.lock().unwrap();
+        model.get_pipe().send(Event::XRun).unwrap();
         jack::Control::Continue
     }
 }

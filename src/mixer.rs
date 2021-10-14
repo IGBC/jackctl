@@ -1,4 +1,4 @@
-use crate::model::{CardStatus, Event, Model};
+use crate::model::{Card, CardConfig, CardStatus, Event, MixerChannel, Model};
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Mixer, Selem, SelemChannelId};
 use alsa::pcm::{HwParams, PCM};
@@ -6,11 +6,6 @@ use alsa::Direction;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-pub type CardId = i32;
-pub type ChannelId = u32;
-pub type Volume = i64;
-pub type SampleRate = u32;
 
 pub struct MixerController {
     model: Model,
@@ -20,6 +15,12 @@ const SAMPLE_RATES: [u32; 19] = [
     8000, 11025, 16000, 22050, 32000, 37800, 44056, 44100, 47250, 48000, 50000, 50400, 64000,
     88200, 96000, 176400, 192000, 352800, 384000,
 ];
+
+pub type CardId = i32;
+pub type ChannelId = u32;
+pub type Volume = i64;
+pub type SampleRate = u32;
+pub type ChannelCount = u32;
 
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
@@ -46,37 +47,52 @@ impl MixerController {
         // first check for new cards
         for alsa_card in CardIter::new().map(|x| x.unwrap()) {
             if !card_ids.contains(&&alsa_card.get_index()) {
-                self.model.lock().unwrap().update(Event::AddCard(
-                    alsa_card.get_index(),
-                    alsa_card.get_name().unwrap(),
-                ));
+                self.model
+                    .lock()
+                    .unwrap()
+                    .get_pipe()
+                    .send(Event::AddCard(
+                        alsa_card.get_index(),
+                        alsa_card.get_name().unwrap(),
+                    ))
+                    .unwrap();
             }
         }
 
-        for card in self.model.lock().unwrap().cards.values_mut() {
+        let model = self.model.lock().unwrap();
+        let keys: Vec<&Card> = model.cards.values().collect();
+        for card in keys.iter() {
             // todo map this into a proper match statement
             match card.state {
-                CardStatus::Unknown => {
-                    match self.attempt_capture_enumerate(card.id) {
-                        Ok(rates) => {
+                CardStatus::Enum => {
+                    let inputs = match self.attempt_capture_enumerate(card.id) {
+                        Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.inputs = Some(rate);
+                            Some(CardConfig {
+                                sample_rate: rate,
+                                channels,
+                            })
                         }
-                        _ => (),
-                    }
+                        _ => None,
+                    };
 
-                    match self.attempt_playback_enumerate(card.id) {
-                        Ok(rates) => {
+                    let outputs = match self.attempt_playback_enumerate(card.id) {
+                        Ok((rates, channels)) => {
                             let rate = self.pick_best_rate(&rates);
-                            card.outputs = Some(rate);
+                            Some(CardConfig {
+                                sample_rate: rate,
+                                channels,
+                            })
                         }
-                        _ => (),
-                    }
+                        _ => None,
+                    };
 
-                    if card.inputs.is_some() || card.outputs.is_some() {
+                    if inputs.is_some() || outputs.is_some() {
                         // this is the old mixer enumeration code, but we're only running it once.
                         // pray that cards do not dynamically change their mixer interfaces.
                         let mixer = Mixer::new(&format!("hw:{}", card.id), false).unwrap();
+
+                        let mut channels: Vec<MixerChannel> = Vec::new();
 
                         for (id, channel) in mixer.iter().enumerate() {
                             let id = id as u32;
@@ -87,7 +103,7 @@ impl MixerController {
 
                             if s.has_capture_volume() {
                                 let (volume_min, volume_max) = s.get_capture_volume_range();
-                                card.add_channel(
+                                let mc = MixerChannel::new(
                                     id,
                                     name,
                                     false,
@@ -95,10 +111,11 @@ impl MixerController {
                                     volume_min,
                                     volume_max,
                                 );
+                                channels.push(mc);
                             } else {
                                 if s.has_playback_volume() {
                                     let (volume_min, volume_max) = s.get_playback_volume_range();
-                                    card.add_channel(
+                                    let mc = MixerChannel::new(
                                         id,
                                         name,
                                         true,
@@ -106,83 +123,117 @@ impl MixerController {
                                         volume_min,
                                         volume_max,
                                     );
+                                    channels.push(mc);
                                 }
                             };
                         }
 
-                        card.state = CardStatus::Active;
+                        model
+                            .get_pipe()
+                            .send(Event::FinishEnumerateCard(
+                                card.id, inputs, outputs, channels,
+                            ))
+                            .unwrap();
                     } else {
                         println!("Failed to enumerate card {} - {}", card.id, card.name());
-                        card.state = CardStatus::EnumFailed;
+                        model
+                            .get_pipe()
+                            .send(Event::FailEnumerateCard(card.id))
+                            .unwrap();
                     }
                 }
-                CardStatus::Active => {
-                    let mixer = Mixer::new(&format!("hw:{}", card.id), false).unwrap();
-
-                    for (id, elem) in mixer.iter().enumerate() {
-                        let selem = Selem::new(elem).unwrap();
-                        match card.channels.get_mut(&(id as u32)) {
-                            Some(channel) => {
-                                if channel.dirty {
-                                    if channel.has_switch {
-                                        Self::set_muting(
+                CardStatus::Active => match Mixer::new(&format!("hw:{}", card.id), false) {
+                    Ok(mixer) => {
+                        for (id, elem) in mixer.iter().enumerate() {
+                            let selem = Selem::new(elem).unwrap();
+                            match card.channels.get(&(id as u32)) {
+                                Some(channel) => {
+                                    if channel.dirty {
+                                        if channel.has_switch {
+                                            Self::set_muting(
+                                                channel.is_playback,
+                                                &selem,
+                                                channel.switch,
+                                            );
+                                        }
+                                        Self::set_volume(
                                             channel.is_playback,
                                             &selem,
-                                            channel.switch,
+                                            channel.volume,
                                         );
+                                        model
+                                            .get_pipe()
+                                            .send(Event::CleanChannel(card.id, channel.id))
+                                            .unwrap();
+                                    } else {
+                                        let sw = if channel.has_switch {
+                                            Self::get_muting(channel.is_playback, &selem)
+                                        } else {
+                                            false
+                                        };
+                                        let volume = Self::get_volume(channel.is_playback, &selem);
+                                        model
+                                            .get_pipe()
+                                            .send(Event::UpdateChannel(
+                                                card.id, channel.id, volume, sw,
+                                            ))
+                                            .unwrap();
                                     }
-                                    Self::set_volume(channel.is_playback, &selem, channel.volume);
-                                    channel.dirty = false;
-                                } else {
-                                    if channel.has_switch {
-                                        channel.switch =
-                                            Self::get_muting(channel.is_playback, &selem);
-                                    }
-                                    channel.volume = Self::get_volume(channel.is_playback, &selem);
                                 }
+                                None => (),
                             }
-                            None => (),
                         }
                     }
-                }
-                CardStatus::EnumFailed => {
-                    // we ignore this card
-                }
+                    Err(e) => {
+                        eprintln!("Could not get mixer for card {}: {}", card.id, e);
+                        model.get_pipe().send(Event::StopCard(card.id)).unwrap();
+                    }
+                },
                 _ => {
-                    panic!("unexpected card SM");
+                    // Card is in a state that mixer doesn't need to worry about
                 }
             }
         }
     }
 
-    fn attempt_playback_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
+    fn attempt_playback_enumerate(
+        &self,
+        card: CardId,
+    ) -> alsa::Result<(Vec<SampleRate>, ChannelCount)> {
         // Open playback device
-        let mut results = Vec::new();
+        let mut rates = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Playback, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
         for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
-                Ok(()) => results.push(*rate),
+                Ok(()) => rates.push(*rate),
                 Err(_) => (),
             }
         }
-        Ok(results)
+
+        let channels = hwp.get_channels_max().unwrap();
+        Ok((rates, channels))
     }
 
-    fn attempt_capture_enumerate(&self, card: CardId) -> alsa::Result<Vec<SampleRate>> {
+    fn attempt_capture_enumerate(
+        &self,
+        card: CardId,
+    ) -> alsa::Result<(Vec<SampleRate>, ChannelCount)> {
         // Open capture device
-        let mut results = Vec::new();
+        let mut rates = Vec::new();
         let pcm = PCM::new(&format!("hw:{}", card), Direction::Capture, false)?;
         let hwp = HwParams::any(&pcm).unwrap();
         hwp.set_rate_resample(false).unwrap();
         for rate in SAMPLE_RATES.iter() {
             match hwp.test_rate(*rate) {
-                Ok(()) => results.push(*rate),
+                Ok(()) => rates.push(*rate),
                 Err(_) => (),
             }
         }
-        Ok(results)
+
+        let channels = hwp.get_channels_max().unwrap();
+        Ok((rates, channels))
     }
 
     fn pick_best_rate(&self, rates: &Vec<SampleRate>) -> SampleRate {
@@ -245,133 +296,3 @@ impl MixerController {
         }
     }
 }
-
-// impl Card {
-//     pub fn new(id: i32, name: String) -> Option<Self> {
-//         let mut playback_rates:Vec<u32> = Vec::new();
-//         let mut capture_rates:Vec<u32> = Vec::new();
-
-//         match PCM::new(&format!("hw:{}", id), Direction::Playback, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//             Ok(pcm) => {
-//                 // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//                 let hwp = HwParams::any(&pcm).unwrap();
-//                 println!("    Playback channels: {}, {}", hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap());
-//                 //,         hwp.get_channels().unwrap());
-//                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in SAMPLE_RATES.iter() {
-//                 for rate in SAMPLE_RATES.iter() {
-//                     match hwp.test_rate(*rate) {
-//                         Ok(()) => {
-//                             println!("        {}: Ok", rate);
-//                             playback_rates.push(*rate);
-//                         },
-//                         Err(_) => (),
-//                     };
-//                 }
-//             },
-//             Err(e) => {
-//                 println!("   Playback - cannot open card: {}", e);
-//             }
-//         }
-
-//         match PCM::new(&format!("hw:{}", id), Direction::Capture, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//             Ok(pcm) => {
-//                 // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//                 let hwp = HwParams::any(&pcm).unwrap();
-//                 println!("    Capture channels: {}, {}", hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap());
-//                 //,         hwp.get_channels().unwrap());
-//                 hwp.set_rate_resample(false).unwrap();
-//                 //for rate in SAMPLE_RATES.iter() {
-//                 for rate in SAMPLE_RATES.iter() {
-//                     match hwp.test_rate(*rate) {
-//                         Ok(()) => {
-//                             println!("        {}: Ok", rate);
-//                             capture_rates.push(*rate);
-//                         },
-//                         Err(_) => (),
-//                     };
-//                 }
-//             },
-//             Err(e) => {
-//                 println!("   Capture - cannot open card: {}", e);
-//             }
-//         }
-
-// for a in ::alsa::card::Iter::new().map(|x| x.unwrap()) {
-//     // Open default playback device
-//     //&format!("hw:{}", a.get_index());
-//     println!("hw:{} {}", a.get_index(), a.get_name().unwrap());
-//     match PCM::new(&format!("hw:{}", a.get_index()), Direction::Playback, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//         Ok(pcm) => {
-//             // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//             let hwp = HwParams::any(&pcm).unwrap();
-//             println!(
-//                 "    Playback channels: {}, {}",
-//                 hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap()
-//             );
-//             //,         hwp.get_channels().unwrap());
-//             hwp.set_rate_resample(true).unwrap();
-//             //for rate in SAMPLE_RATES.iter() {
-//             for rate in SAMPLE_RATES.iter() {
-//                 match hwp.test_rate(*rate) {
-//                     Ok(()) => println!("        {}: Ok", rate),
-//                     Err(_) => (),
-//                 };
-//             }
-//         }
-//         Err(e) => {
-//             println!("   Playback - cannot open card: {}", e);
-//         }
-//     }
-
-//     match PCM::new(&format!("hw:{}", a.get_index()), Direction::Capture, false) {
-//         //match PCM::new("default", Direction::Playback, false) {
-//         Ok(pcm) => {
-//             // Set hardware parameters: 44100 Hz / Mono / 16 bit
-//             let hwp = HwParams::any(&pcm).unwrap();
-//             println!(
-//                 "    Capture channels: {}, {}",
-//                 hwp.get_channels_min().unwrap(),
-//                 hwp.get_channels_max().unwrap()
-//             );
-//             //,         hwp.get_channels().unwrap());
-//             hwp.set_rate_resample(true).unwrap();
-//             //for rate in SAMPLE_RATES.iter() {
-//             for rate in 1..40000000 {
-//                 match hwp.test_rate(rate) {
-//                     Ok(()) => println!("        {}: Ok", rate),
-//                     Err(_) => (),
-//                 };
-//             }
-//         }
-//         Err(e) => {
-//             println!("   Capture - cannot open card: {}", e);
-//         }
-//     }
-
-// use std::ffi::CString;
-// use alsa::hctl::HCtl;
-// let h = HCtl::open(&CString::new(format!("hw:{}", a.get_index())).unwrap(), false).unwrap();
-// h.load().unwrap();
-// for b in h.elem_iter() {
-//     use alsa::ctl::ElemIface;
-//     let id = b.get_id().unwrap();
-//     let name = id.get_name().unwrap();
-//     let value = b.read().unwrap();
-//     println!("hw:{} {} = {:?}", a.get_index(), &name, value);
-
-//     if !name.ends_with(" Jack") { continue; }
-//     if name.ends_with(" Phantom Jack") {
-//         println!("{} is always present", &name[..name.len()-13])
-//     }
-//     else { println!("{} is {}", &name[..name.len()-5],
-//         if b.read().unwrap().get_boolean(0).unwrap() { "plugged in" } else { "unplugged" })
-//     }
-// }
-// }

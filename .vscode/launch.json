@@ -1,0 +1,82 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'jackctl'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=jackctl",
+                    "--package=jackctl"
+                ],
+                "filter": {
+                    "name": "jackctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'jackctl'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=jackctl",
+                    "--package=jackctl"
+                ],
+                "filter": {
+                    "name": "jackctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'enum_cards'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=enum_cards",
+                    "--package=jackctl"
+                ],
+                "filter": {
+                    "name": "enum_cards",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'enum_cards'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=enum_cards",
+                    "--package=jackctl"
+                ],
+                "filter": {
+                    "name": "enum_cards",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
