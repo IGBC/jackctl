@@ -39,11 +39,13 @@
 mod app;
 mod cards;
 mod clients;
+mod jack;
 
 use crate::error::SettingsError;
+use directories::ProjectDirs;
 use serde::de::DeserializeOwned;
 use std::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -51,6 +53,13 @@ use std::{
 
 /// Use a simple u64 to identify audio devices in the future
 pub type Id = u64;
+
+/// Create the required directories
+pub fn scaffold() -> ProjectDirs {
+    let dir = ProjectDirs::from("tech", "sigsegv", "jackctl").unwrap();
+    let _ = fs::create_dir(&dir.config_dir()); // Eat errors for breakfast
+    dir
+}
 
 /// Main settings tree
 #[derive(Default)]
@@ -79,9 +88,9 @@ impl Settings {
     /// Sync any changes back to disk
     pub fn sync(self: &Arc<Self>) -> Result<(), SettingsError> {
         vec![
-            ("app.json", serde_json::to_string(&self.app)?),
-            ("clients.json", serde_json::to_string(&self.clients)?),
-            ("cards.json", serde_json::to_string(&self.cards)?),
+            ("app.json", serde_json::to_string_pretty(&self.app)?),
+            ("clients.json", serde_json::to_string_pretty(&self.clients)?),
+            ("cards.json", serde_json::to_string_pretty(&self.cards)?),
         ]
         .into_iter()
         .map(|(path, json)| {

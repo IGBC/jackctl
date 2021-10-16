@@ -6,8 +6,9 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Card {
     pub id: i32,
-    pub inputs: Option<u32>,  // option contains best sample rate
-    pub outputs: Option<u32>, // option contains best sample rate
+    pub client_handle: Option<u64>,
+    pub inputs: Option<CardConfig>, // option contains best sample rate
+    pub outputs: Option<CardConfig>, // option contains best sample rate
     name: String,
     pub channels: HashMap<u32, MixerChannel>,
     pub state: CardStatus,
@@ -17,15 +18,31 @@ pub struct Card {
 #[derive(Clone, Debug, PartialEq)]
 pub enum CardStatus {
     /// We just found this card, we don't know anything about it yet
-    Unknown,
+    New,
+    /// This Card should be enumerated now
+    Enum,
+    /// This Card should be started now
+    Start,
     /// this card is in use
     Active,
-    /// This card could not be claimed, we should try again later
-    Busy,
+    /// This card should be stopped ASAP
+    Stopping,
+    /// This card was just stopped, it should be put back into new in a few seconds
+    Stopped,
     /// This card could not be enumerated, we are going to leave it alone
     EnumFailed,
+    /// This card could not be started, we are going to leave it alone
+    StartFailed,
+    /// This card is busy, put back to new after a timeout,
+    Busy,
     /// The user has told us not to use this card
     DontUse,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CardConfig {
+    pub sample_rate: u32,
+    pub channels: u32,
 }
 
 /// Struct representing a mixer channel in the model.
@@ -48,6 +65,27 @@ pub struct MixerChannel {
 }
 
 impl MixerChannel {
+    pub fn new(
+        id: u32,
+        name: String,
+        is_playback: bool,
+        has_switch: bool,
+        volume_min: i64,
+        volume_max: i64,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            is_playback,
+            has_switch,
+            volume_min,
+            volume_max,
+            volume: 0,
+            switch: false,
+            dirty: false,
+        }
+    }
+
     pub fn get_name(&self) -> &str {
         &self.name
     }
@@ -81,35 +119,17 @@ impl Card {
     pub fn new(id: i32, name: String) -> Self {
         Card {
             id,
+            client_handle: None,
             inputs: None,
             outputs: None,
             name,
             channels: HashMap::new(),
-            state: CardStatus::Unknown,
+            state: CardStatus::New,
         }
     }
 
-    pub fn add_channel(
-        &mut self,
-        id: u32,
-        name: String,
-        is_playback: bool,
-        has_switch: bool,
-        volume_min: i64,
-        volume_max: i64,
-    ) {
-        let channel = MixerChannel {
-            id,
-            name,
-            is_playback,
-            has_switch,
-            volume_min,
-            volume_max,
-            volume: 0,
-            switch: false,
-            dirty: false,
-        };
-        self.channels.insert(id, channel);
+    pub fn add_channel(&mut self, channel: MixerChannel) {
+        self.channels.insert(channel.id, channel);
     }
 
     pub fn name(&self) -> &str {

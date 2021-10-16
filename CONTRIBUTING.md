@@ -1,10 +1,6 @@
 # Contributing
-<<<<<<< HEAD
 
-Please note when contributing to this project you are bound by our code of conduct. 
-=======
 Please note when contributing to this project you are bound by our code of conduct, and the Contributor's Agreement at the bottom of this document.
->>>>>>> 1cc1e15c0adefbb30b0b52554effabf399f1f0ef
 
 Please refer to code_of_conduct.md for details.
 
