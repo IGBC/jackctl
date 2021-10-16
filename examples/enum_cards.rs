@@ -7,11 +7,6 @@ use std::ffi::CString;
 use std::fs;
 use std::process::abort;
 
-const EXTENDED_SAMPLE_RATES: [u32; 19] = [
-    8000, 11025, 16000, 22050, 32000, 37800, 44056, 44100, 47250, 48000, 50000, 50400, 64000,
-    88200, 96000, 176400, 192000, 352800, 384000,
-];
-
 fn check_playback(id: &str) {
     match PCM::new(id, Direction::Playback, false) {
         Ok(pcm) => {
@@ -144,8 +139,25 @@ fn check_names(id: &str) {
     }
 }
 
+fn check_streams() {
+    for t in &["pcm", "ctl", "rawmidi", "timer", "seq", "hwdep"] {
+        println!("    {} devices:", t);
+        let i = device_name::HintIter::new(None, &*CString::new(*t).unwrap()).unwrap();
+        for a in i {
+            println!(
+                "        [{}]: \"{}\" - Direction {}",
+                a.name.unwrap(),
+                a.desc.unwrap().replace('\n', " "),
+                a.direction
+                    .map(|x| format!("{:?}", x))
+                    .unwrap_or("None".to_owned())
+            )
+        }
+    }
+}
+
 fn print_usage() {
-    eprintln!("usage: enum_cards [alsa|sys]");
+    eprintln!("usage: enum_cards [alsa|sys|streams]");
     abort();
 }
 
@@ -183,9 +195,6 @@ fn main() {
 
                         match mat_ch {
                             Some(caps) => {
-                                let path = entry.path();
-                                let path_str = path.to_str().unwrap();
-
                                 let card = format!("hw:{},{}", &caps["card"], &caps["dev"]);
 
                                 let alsa_card = alsa::card::Card::from_str(
@@ -209,6 +218,9 @@ fn main() {
                 }
                 Err(e) => println!("cannot open /sys/class/sound - {}", e),
             }
+        }
+        "streams" => {
+            check_streams();
         }
         _ => {
             print_usage();
