@@ -10,7 +10,8 @@ use gtk::prelude::*;
 use gtk::{
     AboutDialog, Adjustment, Align, Application, Builder, Button, ButtonsType, CheckButton,
     DialogFlags, Grid, Label, LevelBar, MessageDialog, MessageType, Notebook, Orientation,
-    PositionType, ResponseType, Scale, ScaleBuilder, Separator, Window,
+    PolicyType, PositionType, ResponseType, Scale, ScaleBuilder, ScrolledWindow, Separator,
+    Viewport, Window,
 };
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 use std::cell::RefCell;
@@ -156,7 +157,8 @@ impl MainDialog {
         let performance_latency = get_object(&builder, "latency.performance.maindialog");
 
         // Setup notebook view
-        let tabs = get_object(&builder, "tabs.maindialog");
+        let tabs: Notebook = get_object(&builder, "tabs.maindialog");
+        tabs.set_show_border(false);
 
         // Setup about screen
         let about: AboutDialog = get_object(&builder, "aboutdialog");
@@ -405,23 +407,31 @@ impl MainDialog {
             let (audio_matrix, cb_vec) =
                 self.update_matrix(model.audio_outputs(), model.audio_inputs());
             self.tabs.remove_page(Some(0));
-            self.tabs
-                .insert_page(&audio_matrix, Some(&Label::new(Some("Matrix"))), Some(0));
+            self.tabs.insert_page(
+                &wrap_scroll(&audio_matrix),
+                Some(&Label::new(Some("Matrix"))),
+                Some(0),
+            );
             self.audio_matrix = cb_vec;
 
             // update Midi Matrix Tab
             let (midi_matrix, cb_vec) =
                 self.update_matrix(model.midi_outputs(), model.midi_inputs());
             self.tabs.remove_page(Some(1));
-            self.tabs
-                .insert_page(&midi_matrix, Some(&Label::new(Some("MIDI"))), Some(1));
+            self.tabs.insert_page(
+                &wrap_scroll(&midi_matrix),
+                Some(&Label::new(Some("MIDI"))),
+                Some(1),
+            );
             self.midi_matrix = cb_vec;
 
             // update Mixer Tab
             let (mixer_matrix, cb_vec) = self.update_mixer(&model);
             self.tabs.remove_page(Some(2));
+            let sw = wrap_scroll(&mixer_matrix);
+            sw.set_policy(PolicyType::Automatic, PolicyType::Never);
             self.tabs
-                .insert_page(&mixer_matrix, Some(&Label::new(Some("Mixer"))), Some(2));
+                .insert_page(&sw, Some(&Label::new(Some("Mixer"))), Some(2));
             self.mixer_handles = cb_vec;
 
             self.tabs.show_all();
@@ -624,4 +634,18 @@ fn grid() -> Grid {
     grid.set_valign(Align::Center);
     grid.set_halign(Align::Center);
     grid
+}
+
+fn wrap_scroll<P: IsA<gtk::Widget>>(widget: &P) -> ScrolledWindow {
+    let vp = Viewport::new::<Adjustment, Adjustment>(None, None);
+    vp.add(widget);
+    // vp.set_margin_top(10);
+    // vp.set_margin_start(10);
+    // vp.set_margin_bottom(10);
+    // vp.set_margin_end(10);
+    vp.set_shadow_type(gtk::ShadowType::Out);
+    let sw = ScrolledWindow::new::<Adjustment, Adjustment>(None, None);
+    sw.add(&vp);
+    sw.set_shadow_type(gtk::ShadowType::EtchedIn);
+    sw
 }

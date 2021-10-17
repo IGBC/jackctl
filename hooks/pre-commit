@@ -1,0 +1,3 @@
+set -e
+cargo-fmt -- --check 2>&1
+cargo test 2>&1

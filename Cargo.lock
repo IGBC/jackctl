@@ -231,6 +231,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbus"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60b225f88dd3718253526c38bc333b9986b547a7580abf81186c9461647b2487"
+dependencies = [
+ "libc",
+ "libdbus-sys",
+ "winapi",
+]
+
+[[package]]
+name = "dbus-tree"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15e1727e94490a9e0c1174284ea83fe5e6db853b43cda77d99bb371008a4fd0"
+dependencies = [
+ "dbus",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"

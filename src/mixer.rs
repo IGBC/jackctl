@@ -5,15 +5,35 @@ use alsa::pcm::{HwParams, PCM};
 use alsa::Direction;
 use gtk::prelude::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MixerController {
     model: Model,
+    //locks: HashMap<CardId, CardLock>,
 }
 
-const SAMPLE_RATES: [u32; 19] = [
-    8000, 11025, 16000, 22050, 32000, 37800, 44056, 44100, 47250, 48000, 50000, 50400, 64000,
-    88200, 96000, 176400, 192000, 352800, 384000,
+const SAMPLE_RATES: [u32; 20] = [
+    8000,   // Telephone Audio
+    11025,  // 1/4 CD Audio (Low Quality MPEG)
+    16000,  // 2x Telephone, VoIP
+    22050,  // 1/2 CD Audio (Common in Cheap USB audio)
+    32000,  // Mini DV / DAT / NICAM digital Audio
+    37286,  // Linux snd-pcsp (don't ask)
+    37800,  // CD-ROM XA Audio
+    44056,  // Digtal Audio locked to NTSC Video (44.1k/1.001) (EIAJ Spec)
+    44100,  // CD Audio
+    47250,  // Early PCM Recorders
+    48000,  // Mini DV / DAT / DVD
+    50000,  // Early PCM Recorders
+    50400,  // Early Mitsubishi PCM Recorders
+    64000,  // Uncommon - Included for compatibility
+    88200,  // CD Audio 2x oversampling
+    96000,  // DvD Audio 2x oversampling
+    176400, // CD Audio 4x oversampling (Also HDCD)
+    192000, // DVD Audio 4x oversampling (and most sound cards on PC, and Bluray/HD DVD)
+    352800, // CD 8x (DXD & SACD)
+    384000, // DVD 8x (have never ever seen anything enumerate this fast)
 ];
 
 pub type CardId = i32;
@@ -24,13 +44,18 @@ pub type ChannelCount = u32;
 
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
-        let this = Rc::new(RefCell::new(Self { model }));
+        let this = Rc::new(RefCell::new(Self {
+            model,
+            //locks: HashMap::new(),
+        }));
 
         let this_clone = this.clone();
         glib::timeout_add_local(200, move || {
             this_clone.borrow_mut().update();
             Continue(true)
         });
+
+        //card_lock::CardLock::create_server();
 
         this
     }
