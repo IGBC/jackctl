@@ -9,6 +9,7 @@ use jack::Port as JackPort;
 use jack::{AsyncClient, NotificationHandler, PortFlags, PortId, Unowned};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{mpsc::Sender, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -24,7 +25,7 @@ enum PortDirection {
 }
 
 pub struct JackNotificationController {
-    model: Model,
+    pipe: Mutex<Sender<Event>>,
 }
 
 /// Controller that manages the connection to the JACK server.
@@ -50,7 +51,7 @@ impl JackController {
         };
 
         let async_controller = JackNotificationController {
-            model: model.clone(),
+            pipe: std::sync::Mutex::new(model.lock().unwrap().get_pipe().clone()),
         };
 
         let interface = client.activate_async(async_controller, ()).unwrap();
@@ -181,6 +182,7 @@ impl JackController {
             id, rate, psize, nperiods, quality, in_ports, out_ports
         );
         eprintln!("running audioadapter with: {}", args);
+        eprintln!("jack_load \"{}\" audioadapter -i \"{}\"", name, args);
         client.load_internal_client(name, "audioadapter", &args)
     }
 
@@ -241,8 +243,6 @@ impl NotificationHandler for JackNotificationController {
 
             let port = Port::new(port_id, name.clone());
 
-            let model = self.model.lock().unwrap();
-
             let pt = match self.identify_port(&jack_port) {
                 Ok(pt) => pt,
                 Err(e) => {
@@ -252,26 +252,41 @@ impl NotificationHandler for JackNotificationController {
             };
 
             match pt {
-                (PortType::Audio, PortDirection::Input) => {
-                    model.get_pipe().send(Event::AddAudioInput(port)).unwrap()
-                }
-                (PortType::Audio, PortDirection::Output) => {
-                    model.get_pipe().send(Event::AddAudioOutput(port)).unwrap()
-                }
-                (PortType::Midi, PortDirection::Input) => {
-                    model.get_pipe().send(Event::AddMidiInput(port)).unwrap()
-                }
-                (PortType::Midi, PortDirection::Output) => {
-                    model.get_pipe().send(Event::AddMidiOutput(port)).unwrap()
-                }
+                (PortType::Audio, PortDirection::Input) => self
+                    .pipe
+                    .lock()
+                    .unwrap()
+                    .send(Event::AddAudioInput(port))
+                    .unwrap(),
+                (PortType::Audio, PortDirection::Output) => self
+                    .pipe
+                    .lock()
+                    .unwrap()
+                    .send(Event::AddAudioOutput(port))
+                    .unwrap(),
+                (PortType::Midi, PortDirection::Input) => self
+                    .pipe
+                    .lock()
+                    .unwrap()
+                    .send(Event::AddMidiInput(port))
+                    .unwrap(),
+                (PortType::Midi, PortDirection::Output) => self
+                    .pipe
+                    .lock()
+                    .unwrap()
+                    .send(Event::AddMidiOutput(port))
+                    .unwrap(),
                 (PortType::Unknown(f), _) => {
                     println!("Unknown port format \"{}\" for port {}", f, name);
                     return;
                 }
             }
         } else {
-            let model = self.model.lock().unwrap();
-            model.get_pipe().send(Event::DelPort(port_id)).unwrap();
+            self.pipe
+                .lock()
+                .unwrap()
+                .send(Event::DelPort(port_id))
+                .unwrap();
         }
     }
 
@@ -301,15 +316,16 @@ impl NotificationHandler for JackNotificationController {
             "EVENT: ports_connected {}, {}, {}",
             port_id_a, port_id_b, are_connected
         );
-        let model = self.model.lock().unwrap();
         if are_connected {
-            model
-                .get_pipe()
+            self.pipe
+                .lock()
+                .unwrap()
                 .send(Event::AddConnection(port_id_b, port_id_a))
                 .unwrap();
         } else {
-            model
-                .get_pipe()
+            self.pipe
+                .lock()
+                .unwrap()
                 .send(Event::DelConnection(port_id_b, port_id_a))
                 .unwrap();
         }
@@ -317,8 +333,7 @@ impl NotificationHandler for JackNotificationController {
 
     fn xrun(&mut self, _: &jack::Client) -> jack::Control {
         eprintln!("EVENT: XRun");
-        let model = self.model.lock().unwrap();
-        model.get_pipe().send(Event::XRun).unwrap();
+        self.pipe.lock().unwrap().send(Event::XRun).unwrap();
         jack::Control::Continue
     }
 }
