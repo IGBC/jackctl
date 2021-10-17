@@ -33,6 +33,6 @@ fn main() {
 
     app.run(&args().collect::<Vec<_>>());
     proc_manager.borrow_mut().end();
-    
+
     println!("Jackctl Exiting, Goodbye");
 }
