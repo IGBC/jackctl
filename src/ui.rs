@@ -26,7 +26,7 @@ const GLADEFILE: &str = include_str!("jackctl.glade");
 struct MixerHandle {
     card_id: i32,
     element_id: u32,
-    mute: Option<(CheckButton, SignalHandlerId)>,
+    mute: Option<(gtk::ToggleButton, SignalHandlerId)>,
     volume: (Adjustment, SignalHandlerId),
 }
 
@@ -354,7 +354,8 @@ impl MainDialog {
                     grid.attach(&scale, x_pos, 1, 1, 1);
 
                     let cb_signal = if channel.has_switch {
-                        let (cb, cb_signal) = self.mixer_checkbox(card.id, channel.id);
+                        let (cb, cb_signal) =
+                            self.mixer_checkbox(card.id, channel.id, channel.is_playback);
                         grid.attach(&cb, x_pos, 2, 1, 1);
                         Some((cb, cb_signal))
                     } else {
@@ -531,8 +532,26 @@ impl MainDialog {
         (button, signal_id)
     }
 
-    fn mixer_checkbox(&self, card_id: i32, channel: u32) -> (CheckButton, SignalHandlerId) {
-        let button = CheckButton::new();
+    fn mixer_checkbox(
+        &self,
+        card_id: i32,
+        channel: u32,
+        output: bool,
+    ) -> (gtk::ToggleButton, SignalHandlerId) {
+        let builder = gtk::ToggleButtonBuilder::new();
+        let image = if output {
+            gtk::Image::from_icon_name(Some("audio-volume-muted-symbolic"), gtk::IconSize::Button)
+        } else {
+            gtk::Image::from_icon_name(
+                Some("microphone-sensitivity-muted-symbolic"),
+                gtk::IconSize::Button,
+            )
+        };
+        let button = builder
+            .image(&image)
+            .always_show_image(true)
+            .image_position(gtk::PositionType::Bottom)
+            .build();
         //button.set_active(model.connected_by_id(port1.id(), port2.id()));
         button.set_margin_top(5);
         button.set_margin_start(5);
