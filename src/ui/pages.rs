@@ -1,4 +1,4 @@
-use super::{get_object, utils};
+use crate::ui::utils;
 use glib::object::IsA;
 use gtk::{prelude::*, Builder, Label, Notebook, PolicyType, Widget};
 use std::collections::BTreeMap;
@@ -11,7 +11,7 @@ pub struct Pages {
 impl Pages {
     /// Initialise the page notebook with a list of page labels
     pub fn new(b: &Builder, pages: Vec<&str>) -> Self {
-        let inner: Notebook = get_object(b, "tabs.maindialog");
+        let inner: Notebook = utils::get_object(b, "tabs.maindialog");
         inner.set_show_border(false);
         Self {
             inner,

@@ -4,11 +4,20 @@ use crate::{
 };
 use glib::{object::IsA, SignalHandlerId};
 use gtk::{
-    Adjustment, Align, ButtonExt, CheckButton, ContainerExt, Grid, GridExt, Label, LabelExt,
-    Orientation, ScrolledWindow, ScrolledWindowExt, Separator, ToggleButtonExt, Viewport,
-    ViewportExt, WidgetExt,
+    prelude::BuilderExtManual, Adjustment, Align, Builder, ButtonExt, CheckButton, ContainerExt,
+    Grid, GridExt, Label, LabelExt, Orientation, ScrolledWindow, ScrolledWindowExt, Separator,
+    ToggleButtonExt, Viewport, ViewportExt, WidgetExt,
 };
 use std::{cell::RefCell, rc::Rc};
+
+pub(crate) fn get_object<T>(builder: &Builder, name: &str) -> T
+where
+    T: gtk::prelude::IsA<glib::object::Object>,
+{
+    builder
+        .get_object(name)
+        .expect(&format!("UI file does not contain {}", name))
+}
 
 pub(super) fn grid() -> Grid {
     let grid = Grid::new();

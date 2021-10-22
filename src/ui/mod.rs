@@ -64,16 +64,6 @@ pub struct MainDialog {
     card_dialog: Arc<Mutex<Option<MessageDialog>>>,
 }
 
-fn get_object<T>(builder: &Builder, name: &str) -> T
-where
-    T: gtk::prelude::IsA<glib::object::Object>,
-{
-    let o: T = builder
-        .get_object(name)
-        .expect(&format!("UI file does not contain {}", name));
-    o
-}
-
 pub fn init_ui(
     state: Model,
     jack_controller: Rc<RefCell<JackController>>,
@@ -137,17 +127,17 @@ impl MainDialog {
         // Initialise the state:
 
         // find the main dialog
-        let window: Window = get_object(&builder, "maindialog");
+        let window: Window = utils::get_object(&builder, "maindialog");
 
         // hook up the minimise button
-        let minimise: Button = get_object(&builder, "minimise.maindialog");
+        let minimise: Button = utils::get_object(&builder, "minimise.maindialog");
         let window_clone = window.clone();
         minimise.connect_clicked(move |_| window_clone.hide());
 
         // Setup xruns display
-        let xruns_label: Label = get_object(&builder, "label.xruns.maindialog");
+        let xruns_label: Label = utils::get_object(&builder, "label.xruns.maindialog");
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
-        let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
+        let xruns_icon: Button = utils::get_object(&builder, "button.xruns.maindialog");
         let state_clone = state.clone();
         xruns_icon.connect_clicked(move |icon| {
             state_clone
@@ -160,13 +150,13 @@ impl MainDialog {
         });
 
         // Setup CPU Meter
-        let cpu_label: Label = get_object(&builder, "label.cpu.maindialog");
-        let cpu_meter: LevelBar = get_object(&builder, "meter.cpu.maindialog");
+        let cpu_label: Label = utils::get_object(&builder, "label.cpu.maindialog");
+        let cpu_meter: LevelBar = utils::get_object(&builder, "meter.cpu.maindialog");
 
         // Setup Time status display
-        let performance_rate = get_object(&builder, "samplerate.performance.maindialog");
-        let performance_frames = get_object(&builder, "wordsize.performance.maindialog");
-        let performance_latency = get_object(&builder, "latency.performance.maindialog");
+        let performance_rate = utils::get_object(&builder, "samplerate.performance.maindialog");
+        let performance_frames = utils::get_object(&builder, "wordsize.performance.maindialog");
+        let performance_latency = utils::get_object(&builder, "latency.performance.maindialog");
 
         // Setup page view abstraction
         let pages = Pages::new(&builder, vec!["Matrix", "MIDI", "Mixer", "Tools"]);
@@ -212,7 +202,7 @@ impl MainDialog {
         self.window.set_application(Some(app));
 
         // Setup Main Menu
-        let quit: gtk::ModelButton = get_object(&self.builder, "quit.mainmenu");
+        let quit: gtk::ModelButton = utils::get_object(&self.builder, "quit.mainmenu");
         let app_clone = app.clone();
         quit.connect_clicked(move |_| Self::quit(&app_clone));
     }
