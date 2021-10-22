@@ -27,8 +27,8 @@ pub struct ModelInner {
     pub layout_dirty: bool,
 
     pub cpu_percent: f32,
-    pub sample_rate: usize,
-    pub buffer_size: u32,
+    pub sample_rate: u64,
+    pub buffer_size: u64,
     pub latency: u64,
 
     audio_inputs: PortGroup,
@@ -89,6 +89,12 @@ impl ModelInner {
             match evt {
                 Event::XRun => self.increment_xruns(),
                 Event::ResetXruns => self.reset_xruns(),
+                Event::JackSettings(cpu_percent, sample_rate, buffer_size, latency) => {
+                    self.cpu_percent = cpu_percent;
+                    self.sample_rate = sample_rate;
+                    self.buffer_size = buffer_size;
+                    self.latency = latency
+                }
 
                 Event::AddCard(id, name) => {
                     self.card_detected(id, name);

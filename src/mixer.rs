@@ -1,11 +1,11 @@
 use crate::model::{Card, CardConfig, CardStatus, Event, MixerChannel, Model};
+use crate::model2::card::{CardId, ChannelCount, ChannelId, SampleRate, Volume};
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Mixer, Selem, SelemChannelId};
 use alsa::pcm::{HwParams, PCM};
 use alsa::Direction;
 use gtk::prelude::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MixerController {
@@ -35,12 +35,6 @@ const SAMPLE_RATES: [u32; 20] = [
     352800, // CD 8x (DXD & SACD)
     384000, // DVD 8x (have never ever seen anything enumerate this fast)
 ];
-
-pub type CardId = i32;
-pub type ChannelId = u32;
-pub type Volume = i64;
-pub type SampleRate = u32;
-pub type ChannelCount = u32;
 
 impl MixerController {
     pub fn new(model: Model) -> Rc<RefCell<Self>> {
