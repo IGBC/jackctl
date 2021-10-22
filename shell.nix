@@ -6,7 +6,7 @@ stdenv.mkDerivation {
     rustc cargo rust-analyzer rustfmt
 
     pkg-config clang_12 clang12Stdenv
-    alsa-lib cairo pango atk
+    alsa-lib cairo pango atk dbus
     gtk3 glib gdk-pixbuf libappindicator-gtk3
     jack2
   ];

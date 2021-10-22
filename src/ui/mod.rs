@@ -2,16 +2,26 @@
 //!
 //! Don't expect me to document this module. It will change with every tiny change to the GUI.
 
+mod about;
+mod matrix;
+mod midi;
+mod pages;
+mod utils;
+
+use about::About;
+use matrix::AudioMatrix;
+use midi::MidiMatrix;
+use pages::Pages;
+
 use crate::jack::JackController;
-use crate::model::{CardStatus, Event, MixerChannel, Model, ModelInner, Port, PortGroup};
+use crate::model::{CardStatus, Event, MixerChannel, Model, ModelInner};
 use gio::prelude::*;
 use glib::signal::SignalHandlerId;
 use gtk::prelude::*;
 use gtk::{
-    AboutDialog, Adjustment, Align, Application, Builder, Button, ButtonsType, CheckButton,
-    DialogFlags, Grid, Label, LevelBar, MessageDialog, MessageType, Notebook, Orientation,
-    PolicyType, PositionType, ResponseType, Scale, ScaleBuilder, ScrolledWindow, Separator,
-    Viewport, Window,
+    Adjustment, Align, Application, Builder, Button, ButtonsType, DialogFlags, Grid, Label,
+    LevelBar, MessageDialog, MessageType, Orientation, PositionType, ResponseType, Scale,
+    ScaleBuilder, Separator, Window,
 };
 use libappindicator::{AppIndicator, AppIndicatorStatus};
 use std::cell::RefCell;
@@ -20,8 +30,8 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-const STYLE: &str = include_str!("jackctl.css");
-const GLADEFILE: &str = include_str!("jackctl.glade");
+const STYLE: &str = include_str!("../jackctl.css");
+const GLADEFILE: &str = include_str!("../jackctl.glade");
 
 struct MixerHandle {
     card_id: i32,
@@ -43,23 +53,15 @@ pub struct MainDialog {
     performance_rate: Label,
     performance_frames: Label,
     performance_latency: Label,
-    tabs: Notebook,
 
-    audio_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
-    midi_matrix: Vec<(u32, u32, CheckButton, SignalHandlerId)>,
+    pages: Pages,
+
+    audio_matrix: AudioMatrix,
+    midi_matrix: MidiMatrix,
+
     mixer_handles: Vec<MixerHandle>,
 
     card_dialog: Arc<Mutex<Option<MessageDialog>>>,
-}
-
-fn get_object<T>(builder: &Builder, name: &str) -> T
-where
-    T: gtk::prelude::IsA<glib::object::Object>,
-{
-    let o: T = builder
-        .get_object(name)
-        .expect(&format!("UI file does not contain {}", name));
-    o
 }
 
 pub fn init_ui(
@@ -125,17 +127,17 @@ impl MainDialog {
         // Initialise the state:
 
         // find the main dialog
-        let window: Window = get_object(&builder, "maindialog");
+        let window: Window = utils::get_object(&builder, "maindialog");
 
         // hook up the minimise button
-        let minimise: Button = get_object(&builder, "minimise.maindialog");
+        let minimise: Button = utils::get_object(&builder, "minimise.maindialog");
         let window_clone = window.clone();
         minimise.connect_clicked(move |_| window_clone.hide());
 
         // Setup xruns display
-        let xruns_label: Label = get_object(&builder, "label.xruns.maindialog");
+        let xruns_label: Label = utils::get_object(&builder, "label.xruns.maindialog");
         xruns_label.set_markup(&format!("{} XRuns", "N.D."));
-        let xruns_icon: Button = get_object(&builder, "button.xruns.maindialog");
+        let xruns_icon: Button = utils::get_object(&builder, "button.xruns.maindialog");
         let state_clone = state.clone();
         xruns_icon.connect_clicked(move |icon| {
             state_clone
@@ -148,24 +150,19 @@ impl MainDialog {
         });
 
         // Setup CPU Meter
-        let cpu_label: Label = get_object(&builder, "label.cpu.maindialog");
-        let cpu_meter: LevelBar = get_object(&builder, "meter.cpu.maindialog");
+        let cpu_label: Label = utils::get_object(&builder, "label.cpu.maindialog");
+        let cpu_meter: LevelBar = utils::get_object(&builder, "meter.cpu.maindialog");
 
         // Setup Time status display
-        let performance_rate = get_object(&builder, "samplerate.performance.maindialog");
-        let performance_frames = get_object(&builder, "wordsize.performance.maindialog");
-        let performance_latency = get_object(&builder, "latency.performance.maindialog");
+        let performance_rate = utils::get_object(&builder, "samplerate.performance.maindialog");
+        let performance_frames = utils::get_object(&builder, "wordsize.performance.maindialog");
+        let performance_latency = utils::get_object(&builder, "latency.performance.maindialog");
 
-        // Setup notebook view
-        let tabs: Notebook = get_object(&builder, "tabs.maindialog");
-        tabs.set_show_border(false);
+        // Setup page view abstraction
+        let pages = Pages::new(&builder, vec!["Matrix", "MIDI", "Mixer", "Tools"]);
 
         // Setup about screen
-        let about: AboutDialog = get_object(&builder, "aboutdialog");
-        about.set_version(Some(env!("CARGO_PKG_VERSION")));
-        about.connect_response(move |dialog, _| dialog.hide());
-        let aboutbutton: gtk::ModelButton = get_object(&builder, "about.mainmenu");
-        aboutbutton.connect_clicked(move |_| about.show());
+        About::new(&builder).button(&builder);
 
         // Save the bits we need
         let this = Rc::new(RefCell::new(MainDialog {
@@ -180,9 +177,9 @@ impl MainDialog {
             performance_rate,
             performance_frames,
             performance_latency,
-            tabs,
-            audio_matrix: Vec::new(),
-            midi_matrix: Vec::new(),
+            pages,
+            audio_matrix: AudioMatrix::new(),
+            midi_matrix: MidiMatrix::new(),
             mixer_handles: Vec::new(),
             card_dialog: Arc::new(Mutex::new(None)),
         }));
@@ -205,7 +202,7 @@ impl MainDialog {
         self.window.set_application(Some(app));
 
         // Setup Main Menu
-        let quit: gtk::ModelButton = get_object(&self.builder, "quit.mainmenu");
+        let quit: gtk::ModelButton = utils::get_object(&self.builder, "quit.mainmenu");
         let app_clone = app.clone();
         quit.connect_clicked(move |_| Self::quit(&app_clone));
     }
@@ -215,103 +212,14 @@ impl MainDialog {
         self.window.present();
     }
 
-    fn update_matrix(
-        &self,
-        inputs: &PortGroup,
-        outputs: &PortGroup,
-    ) -> (Grid, Vec<(u32, u32, CheckButton, SignalHandlerId)>) {
-        let grid = grid();
-
-        if inputs.is_empty() || outputs.is_empty() {
-            let l = grid_label("No ports are currently available.", false);
-            l.set_halign(Align::Center);
-            grid.attach(&l, 0, 0, 1, 1);
-
-            (grid, Vec::new())
-        } else {
-            let i_groups = inputs.no_groups();
-            let o_groups = outputs.no_groups();
-            let n_audio_inputs = inputs.len();
-            let n_audio_outputs = outputs.len();
-            let max_x: i32 = 2 + i_groups as i32 + n_audio_inputs as i32 - 1;
-            let max_y: i32 = 2 + o_groups as i32 + n_audio_outputs as i32 - 1;
-
-            let mut curr_x = 2;
-            for (i, g) in inputs.iter().enumerate() {
-                let l = grid_label(g.name(), true);
-                // Don't re-enable this, it causes a spacing bug
-                // TODO: Manual Word Wrapping.
-                //l.set_line_wrap(true);
-                grid.attach(&l, curr_x, 0, g.len() as i32, 1);
-
-                for n in g.iter() {
-                    grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
-                    curr_x += 1;
-                }
-
-                if i < i_groups - 1 {
-                    grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
-                    curr_x += 1;
-                }
-            }
-
-            let mut curr_y = 2;
-            for (i, g) in outputs.iter().enumerate() {
-                let l = grid_label(g.name(), false);
-                l.set_line_wrap(true);
-                grid.attach(&l, 0, curr_y, 1, g.len() as i32);
-
-                for n in g.iter() {
-                    grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
-                    curr_y += 1;
-                }
-
-                if i < o_groups - 1 {
-                    grid.attach(
-                        &Separator::new(Orientation::Horizontal),
-                        0,
-                        curr_y,
-                        max_x,
-                        1,
-                    );
-                    curr_y += 1;
-                }
-            }
-
-            let mut curr_x = 2;
-            let mut handles = Vec::new();
-            for g2 in inputs.iter() {
-                for n2 in g2.iter() {
-                    let mut curr_y = 2;
-                    for g1 in outputs.iter() {
-                        for n1 in g1.iter() {
-                            let (cb, handler) = self.grid_checkbox(n2, n1);
-                            grid.attach(&cb, curr_x, curr_y, 1, 1);
-
-                            handles.push((n1.id(), n2.id(), cb, handler));
-                            curr_y += 1;
-                        }
-                        // skip over the separator;
-                        curr_y += 1;
-                    }
-                    curr_x += 1;
-                }
-                // skip over the separator
-                curr_x += 1;
-            }
-
-            (grid, handles)
-        }
-    }
-
     fn update_mixer(&self, model: &ModelInner) -> (Grid, Vec<MixerHandle>) {
-        let grid = grid();
+        let grid = utils::grid();
         let mut handles = Vec::new();
         grid.set_hexpand(true);
         grid.set_vexpand(true);
         if model.cards.is_empty() {
             grid.attach(
-                &mixer_label("No controllable devices are detected.", false),
+                &utils::mixer_label("No controllable devices are detected.", false),
                 0,
                 0,
                 1,
@@ -331,9 +239,15 @@ impl MainDialog {
         {
             let len = card.len();
             if len == 0 {
-                grid.attach(&mixer_label(card.name(), false), x_pos as i32, 3, 1, 1);
                 grid.attach(
-                    &mixer_label("Device Has No Controls", true),
+                    &utils::mixer_label(card.name(), false),
+                    x_pos as i32,
+                    3,
+                    1,
+                    1,
+                );
+                grid.attach(
+                    &utils::mixer_label("Device Has No Controls", true),
                     x_pos as i32,
                     0,
                     1,
@@ -341,14 +255,26 @@ impl MainDialog {
                 );
                 x_pos += 1;
             } else {
-                grid.attach(&mixer_label(card.name(), false), x_pos, 3, len as i32, 1);
+                grid.attach(
+                    &utils::mixer_label(card.name(), false),
+                    x_pos,
+                    3,
+                    len as i32,
+                    1,
+                );
 
                 // get the card in order, for consistency with things like alsamixer.
                 let mut keys: Vec<&MixerChannel> = card.iter().collect();
                 keys.sort_by(|a, b| a.id.cmp(&b.id));
 
                 for channel in keys {
-                    grid.attach(&mixer_label(channel.get_name(), true), x_pos, 0, 1, 1);
+                    grid.attach(
+                        &utils::mixer_label(channel.get_name(), true),
+                        x_pos,
+                        0,
+                        1,
+                        1,
+                    );
 
                     let (scale, adjustment, scale_signal) = self.mixer_fader(card.id, channel);
                     grid.attach(&scale, x_pos, 1, 1, 1);
@@ -402,42 +328,31 @@ impl MainDialog {
 
         if model.layout_dirty {
             model.layout_dirty = false;
-            let page = self.tabs.get_current_page();
+            let page = self.pages.get_current();
 
             // update Audio Matrix Tab
-            let (audio_matrix, cb_vec) =
-                self.update_matrix(model.audio_outputs(), model.audio_inputs());
-            self.tabs.remove_page(Some(0));
-            self.tabs.insert_page(
-                &wrap_scroll(&audio_matrix),
-                Some(&Label::new(Some("Matrix"))),
-                Some(0),
+            self.audio_matrix.update(
+                &mut self.pages,
+                &self.jack_controller,
+                model.audio_outputs(),
+                model.audio_inputs(),
             );
-            self.audio_matrix = cb_vec;
 
-            // update Midi Matrix Tab
-            let (midi_matrix, cb_vec) =
-                self.update_matrix(model.midi_outputs(), model.midi_inputs());
-            self.tabs.remove_page(Some(1));
-            self.tabs.insert_page(
-                &wrap_scroll(&midi_matrix),
-                Some(&Label::new(Some("MIDI"))),
-                Some(1),
+            self.midi_matrix.update(
+                &mut self.pages,
+                &self.jack_controller,
+                model.midi_outputs(),
+                model.midi_inputs(),
             );
-            self.midi_matrix = cb_vec;
 
             // update Mixer Tab
             let (mixer_matrix, cb_vec) = self.update_mixer(&model);
-            self.tabs.remove_page(Some(2));
-            let sw = wrap_scroll(&mixer_matrix);
-            sw.set_policy(PolicyType::Automatic, PolicyType::Never);
-            self.tabs
-                .insert_page(&sw, Some(&Label::new(Some("Mixer"))), Some(2));
+            self.pages.remove_page("Mixer");
+            self.pages.insert_horizontal("Mixer", &mixer_matrix);
             self.mixer_handles = cb_vec;
 
-            self.tabs.show_all();
-
-            self.tabs.set_current_page(page);
+            self.pages.show_all();
+            self.pages.set_current(page);
         }
 
         for (i, j, item, handle) in self.audio_matrix.iter() {
@@ -515,21 +430,6 @@ impl MainDialog {
         }
 
         gtk::Inhibit(false)
-    }
-
-    fn grid_checkbox(&self, port1: &Port, port2: &Port) -> (CheckButton, SignalHandlerId) {
-        let button = CheckButton::new();
-        button.set_margin_top(5);
-        button.set_margin_start(5);
-        button.set_margin_bottom(5);
-        button.set_margin_end(5);
-        let clone = self.jack_controller.clone();
-        let id1 = port1.id();
-        let id2 = port2.id();
-        let signal_id = button.connect_clicked(move |cb| {
-            clone.borrow().connect_ports(id1, id2, cb.get_active());
-        });
-        (button, signal_id)
     }
 
     fn mixer_checkbox(
@@ -610,61 +510,4 @@ impl MainDialog {
         s.set_value_pos(PositionType::Bottom);
         (s, a, signal)
     }
-}
-
-fn grid_label(text: &str, vertical: bool) -> Label {
-    let l = Label::new(Some(text));
-    l.set_margin_top(5);
-    l.set_margin_start(5);
-    l.set_margin_bottom(5);
-    l.set_margin_end(5);
-    if vertical {
-        l.set_angle(90.0);
-        l.set_valign(Align::End);
-    } else {
-        l.set_halign(Align::End);
-        l.set_justify(gtk::Justification::Right);
-        l.set_xalign(1.0);
-    }
-    l
-}
-
-fn mixer_label(text: &str, vertical: bool) -> Label {
-    let l = Label::new(Some(text));
-    l.set_margin_top(5);
-    l.set_margin_start(5);
-    l.set_margin_bottom(5);
-    l.set_margin_end(5);
-    if vertical {
-        l.set_angle(90.0);
-        l.set_valign(Align::End);
-    } else {
-        l.set_halign(Align::Center);
-    }
-    l
-}
-
-fn grid() -> Grid {
-    let grid = Grid::new();
-    grid.set_margin_top(5);
-    grid.set_margin_start(5);
-    grid.set_margin_bottom(5);
-    grid.set_margin_end(5);
-    grid.set_valign(Align::Center);
-    grid.set_halign(Align::Center);
-    grid
-}
-
-fn wrap_scroll<P: IsA<gtk::Widget>>(widget: &P) -> ScrolledWindow {
-    let vp = Viewport::new::<Adjustment, Adjustment>(None, None);
-    vp.add(widget);
-    // vp.set_margin_top(10);
-    // vp.set_margin_start(10);
-    // vp.set_margin_bottom(10);
-    // vp.set_margin_end(10);
-    vp.set_shadow_type(gtk::ShadowType::Out);
-    let sw = ScrolledWindow::new::<Adjustment, Adjustment>(None, None);
-    sw.add(&vp);
-    sw.set_shadow_type(gtk::ShadowType::EtchedIn);
-    sw
 }
