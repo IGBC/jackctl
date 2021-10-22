@@ -6,7 +6,7 @@ use smol::{
     channel::{bounded, Receiver, Sender},
     LocalExecutor,
 };
-use std::thread;
+use std::{sync::Arc, thread};
 
 /// An easily clonable handle to the jack runtime
 #[derive(Clone)]
@@ -57,14 +57,37 @@ impl JackRuntime {
     /// Bootstrap a smol runtime on a dedicated thread
     fn bootstrap(self) {
         thread::spawn(move || {
-            let rt_state = self;
+            let rt_state = Arc::new(self);
             let local_exec = LocalExecutor::new();
-            block_on(local_exec.run(rt_state.run()))
+
+            local_exec.spawn(Arc::clone(&rt_state).run_cmd());
+            local_exec.spawn(Arc::clone(&rt_state).run_cmd());
+            local_exec.spawn(Arc::clone(&rt_state).run_jack());
         });
     }
 
-    /// Main executor run loop
-    async fn run(mut self) {
-        todo!()
+    /// Handle incoming general jack commands
+    async fn run_cmd(self: Arc<Self>) {
+        while let Ok(cmd) = self.cmd_rx.recv().await {
+            match cmd {
+                // ...
+                _ => {}
+            }
+        }
+    }
+
+    /// Handle incoming jack action messages
+    async fn run_card(self: Arc<Self>) {
+        while let Ok(card) = self.card_rx.recv().await {
+            match card {
+                // ...
+                _ => {}
+            }
+        }
+    }
+
+    /// Handle connection to the jack server
+    async fn run_jack(self: Arc<Self>) {
+        
     }
 }

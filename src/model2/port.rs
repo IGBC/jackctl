@@ -1,19 +1,20 @@
 pub type JackPortType = u32;
 
 /// Struct wrapping all the groups (clients) in a model for a given port type
+#[derive(Default)]
 pub struct PortGroup {
     groups: Vec<Group>,
 }
 
 /// Struct wrapping all the Ports in a group
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Group {
     name: String,
     ports: Vec<Port>,
 }
 
 /// An individual port in the jack server, mapped to a unique (internal) id.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Port {
     portname: String,
     groupname: String,

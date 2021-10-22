@@ -4,6 +4,7 @@ mod cb_channel;
 mod error;
 mod model2;
 mod settings;
+mod rts;
 
 // mod jack;
 // mod mixer;
@@ -21,6 +22,9 @@ fn main() {
 
     println!("{:?}", set.r().app());
 
+    let jack = rts::jack::JackRuntime::start();
+    let model = model2::Model::new(jack, set);
+    
     // if gtk::init().is_err() {
     //     println!("Failed to start GTK, please ensure all dependancies are installed");
     // }
