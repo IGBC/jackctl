@@ -41,6 +41,7 @@ impl Pages {
         self.insert(label, &utils::wrap_scroll(child));
     }
 
+    #[inline]
     pub fn insert_horizontal<T: IsA<Widget>>(&mut self, label: &str, child: &T) {
         let horizontal = utils::wrap_scroll(child);
         horizontal.set_policy(PolicyType::Automatic, PolicyType::Never);

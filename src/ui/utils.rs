@@ -10,7 +10,7 @@ use gtk::{
 };
 use std::{cell::RefCell, rc::Rc};
 
-pub(crate) fn get_object<T>(builder: &Builder, name: &str) -> T
+pub(super) fn get_object<T>(builder: &Builder, name: &str) -> T
 where
     T: gtk::prelude::IsA<glib::object::Object>,
 {
@@ -44,7 +44,7 @@ pub(super) fn wrap_scroll<P: IsA<gtk::Widget>>(widget: &P) -> ScrolledWindow {
     sw
 }
 
-pub(crate) fn grid_label(text: &str, vertical: bool) -> Label {
+pub(super) fn grid_label(text: &str, vertical: bool) -> Label {
     let l = Label::new(Some(text));
     l.set_margin_top(5);
     l.set_margin_start(5);
@@ -61,7 +61,7 @@ pub(crate) fn grid_label(text: &str, vertical: bool) -> Label {
     l
 }
 
-pub(crate) fn mixer_label(text: &str, vertical: bool) -> Label {
+pub(super) fn mixer_label(text: &str, vertical: bool) -> Label {
     let l = Label::new(Some(text));
     l.set_margin_top(5);
     l.set_margin_start(5);
@@ -76,7 +76,7 @@ pub(crate) fn mixer_label(text: &str, vertical: bool) -> Label {
     l
 }
 
-pub(crate) fn grid_checkbox(
+pub(super) fn grid_checkbox(
     jack: &Rc<RefCell<JackController>>,
     port1: &Port,
     port2: &Port,
@@ -95,7 +95,7 @@ pub(crate) fn grid_checkbox(
     (button, signal_id)
 }
 
-pub(crate) fn generate_grid(
+pub(super) fn generate_grid(
     jack: &Rc<RefCell<JackController>>,
     inputs: &PortGroup,
     outputs: &PortGroup,

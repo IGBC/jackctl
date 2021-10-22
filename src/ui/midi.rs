@@ -24,7 +24,6 @@ impl MidiMatrix {
         outputs: &PortGroup,
     ) {
         let (grid, callbacks) = utils::generate_grid(jack, inputs, outputs);
-
         pages.remove_page("MIDI");
         pages.insert_scrolled("MIDI", &grid);
         self.inner = callbacks;
