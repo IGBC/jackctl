@@ -1,3 +1,7 @@
+mod card;
+mod client;
+mod cmd;
+
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
 use crate::model2::events::{Event, JackCardAction, JackCmd};
 use futures_lite::future::block_on;
@@ -60,34 +64,12 @@ impl JackRuntime {
             let rt_state = Arc::new(self);
             let local_exec = LocalExecutor::new();
 
-            local_exec.spawn(Arc::clone(&rt_state).run_cmd());
-            local_exec.spawn(Arc::clone(&rt_state).run_cmd());
-            local_exec.spawn(Arc::clone(&rt_state).run_jack());
+            // Spawn two tasks to handle card and jack commands
+            local_exec.spawn(cmd::spawn_handle(&rt_state));
+            local_exec.spawn(card::spawn_handle(&rt_state));
+
+            // Then block this thread on the last future to prevent it from terminating
+            block_on(async { local_exec.run(client::spawn_handle(&rt_state)).await });
         });
-    }
-
-    /// Handle incoming general jack commands
-    async fn run_cmd(self: Arc<Self>) {
-        while let Ok(cmd) = self.cmd_rx.recv().await {
-            match cmd {
-                // ...
-                _ => {}
-            }
-        }
-    }
-
-    /// Handle incoming jack action messages
-    async fn run_card(self: Arc<Self>) {
-        while let Ok(card) = self.card_rx.recv().await {
-            match card {
-                // ...
-                _ => {}
-            }
-        }
-    }
-
-    /// Handle connection to the jack server
-    async fn run_jack(self: Arc<Self>) {
-        
     }
 }
