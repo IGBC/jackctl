@@ -1,3 +1,4 @@
+mod async_client;
 mod card;
 mod client;
 mod cmd;
@@ -5,12 +6,13 @@ mod cmd;
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
 use crate::model2::events::{Event, JackCardAction, JackCmd};
 use futures_lite::future::block_on;
-use jack::AsyncClient;
+use jack::{AsyncClient, Client, InternalClientID};
 use smol::{
     channel::{bounded, Receiver, Sender},
     LocalExecutor,
 };
 use std::{sync::Arc, thread};
+use jack::Client as JackClient;
 
 /// An easily clonable handle to the jack runtime
 #[derive(Clone)]
@@ -20,30 +22,40 @@ pub struct JackHandle {
     /// Receive events from the jack runtime
     event_rx: Receiver<Event>,
     /// Send card actions to jack runtime with blocking ACK
-    card_tx: ReturningSender<JackCardAction, ()>,
+    card_tx: ReturningSender<JackCardAction, Result<InternalClientID, jack::Error>>,
 }
 
 /// Jack server runtime and signalling state
 pub struct JackRuntime {
     /// Connection to the jack server
-    client: AsyncClient<(), ()>,
+    client: Client,
+    /// Jac Event Reciever;
+    a_client: AsyncClient<async_client::JackNotificationController, ()>,
+    
     /// Receive jack commands
     cmd_rx: Receiver<JackCmd>,
     /// Send events to the model layer
     event_tx: Sender<Event>,
     /// Receive card commands
-    card_rx: ReturningReceiver<JackCardAction, ()>,
+    card_rx: ReturningReceiver<JackCardAction, Result<InternalClientID, jack::Error>>,
 }
 
 impl JackRuntime {
-    pub fn start() -> JackHandle {
+    pub fn start() -> Result<JackHandle,jack::Error> {
+        // Open the channels
         let (event_tx, event_rx) = bounded(4);
         let (cmd_tx, cmd_rx) = bounded(4);
         let (card_tx, card_rx) = cb_channel::bounded(4);
 
+        // initialise jack
+        let a_client = async_client::JackNotificationController::new(event_tx);
+        let (client, status) = JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER)?;
+        let a_client = client.activate_async(a_client, ())?;
+
         // Initialise and bootstrap the jack runtime
         Self {
-            client: todo!(),
+            client,
+            a_client,
             cmd_rx,
             event_tx,
             card_rx,
@@ -51,11 +63,11 @@ impl JackRuntime {
         .bootstrap();
 
         // Return a sending handle
-        JackHandle {
+        Ok(JackHandle {
             cmd_tx,
             event_rx,
             card_tx,
-        }
+        })
     }
 
     /// Bootstrap a smol runtime on a dedicated thread
