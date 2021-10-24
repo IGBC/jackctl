@@ -5,6 +5,7 @@
 __A no fuss solution to wrangling Pro-Audio on Linux__
 
 ![Matrix](https://img.shields.io/matrix/jackctl:matrix.org?label=Matrix%20Chat)
+![Gitlab pipeline status](https://img.shields.io/gitlab/pipeline-status/IGBC/jackctl?branch=main&logo=linux&logoColor=white)
 
 ![Audio Matrix Tab Screenshot](/images/Matrix.png)
 
