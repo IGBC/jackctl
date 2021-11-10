@@ -22,7 +22,7 @@ fn main() {
 
     println!("{:?}", set.r().app());
 
-    let jack = rts::jack::JackRuntime::start();
+    let jack = rts::jack::JackRuntime::start().unwrap();
     let model = model2::Model::new(jack, set);
     
     // if gtk::init().is_err() {

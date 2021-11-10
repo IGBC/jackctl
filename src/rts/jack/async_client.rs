@@ -1,8 +1,8 @@
 use crate::model2::events::Event;
-use smol::channel::Sender;
-use jack::{Port as JackPort, Unowned, PortFlags, NotificationHandler, PortId};
-use jack:: Error as JackError;
-use crate::model2::port::{Port,PortDirection,PortType};
+use crate::model2::port::{Port, PortDirection, PortType};
+use async_std::channel::Sender;
+use jack::Error as JackError;
+use jack::{NotificationHandler, Port as JackPort, PortFlags, PortId, Unowned};
 
 pub struct JackNotificationController {
     pipe: Sender<Event>,
@@ -12,7 +12,7 @@ impl JackNotificationController {
     pub fn new(pipe: Sender<Event>) -> Self {
         Self { pipe }
     }
-    
+
     fn identify_port(&self, p: &JackPort<Unowned>) -> Result<(PortType, PortDirection), JackError> {
         let port_type = match p.port_type()?.as_str() {
             "32 bit float mono audio" => PortType::Audio,
@@ -65,29 +65,29 @@ impl NotificationHandler for JackNotificationController {
                 }
             };
 
-            let port = Port::new(port_id, name.clone());
+            // let port = JackPort::new(port_id, name.clone());
 
-            let pt = match self.identify_port(&jack_port) {
-                Ok(pt) => pt,
-                Err(e) => {
-                    eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
-                    return;
-                }
-            };
+            //     let pt = match self.identify_port(&jack_port) {
+            //         Ok(pt) => pt,
+            //         Err(e) => {
+            //             eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
+            //             return;
+            //         }
+            //     };
 
-            let e = match pt {
-                (PortType::Audio, PortDirection::Input) => Event::AddAudioInput(port),
-                (PortType::Audio, PortDirection::Output) => Event::AddAudioOutput(port),
-                (PortType::Midi, PortDirection::Input) => Event::AddMidiInput(port),
-                (PortType::Midi, PortDirection::Output) => Event::AddMidiOutput(port),
-                (PortType::Unknown(f), _) => {
-                    println!("Unknown port format \"{}\" for port {}", f, name);
-                    return;
-                },
-            };
-            self.sync_send(e);
-        } else {
-            self.sync_send(Event::DelPort(port_id));
+            //     let e = match pt {
+            //         (PortType::Audio, PortDirection::Input) => Event::AddAudioInput(port),
+            //         (PortType::Audio, PortDirection::Output) => Event::AddAudioOutput(port),
+            //         (PortType::Midi, PortDirection::Input) => Event::AddMidiInput(port),
+            //         (PortType::Midi, PortDirection::Output) => Event::AddMidiOutput(port),
+            //         (PortType::Unknown(f), _) => {
+            //             println!("Unknown port format \"{}\" for port {}", f, name);
+            //             return;
+            //         },
+            //     };
+            //     self.sync_send(e);
+            // } else {
+            //     self.sync_send(Event::DelPort(port_id));
         }
     }
 
@@ -118,8 +118,7 @@ impl NotificationHandler for JackNotificationController {
             port_id_a, port_id_b, are_connected
         );
         if are_connected {
-            self
-                .sync_send(Event::AddConnection(port_id_b, port_id_a));
+            self.sync_send(Event::AddConnection(port_id_b, port_id_a));
         } else {
             self.sync_send(Event::DelConnection(port_id_b, port_id_a));
         }

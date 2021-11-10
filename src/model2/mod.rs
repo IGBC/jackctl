@@ -14,8 +14,7 @@ use self::{
     midi::MidiGroups,
 };
 use crate::{rts::jack::JackHandle, settings::Settings};
-use futures_lite::future::block_on;
-use smol::LocalExecutor;
+use async_std::task;
 use std::{collections::BTreeMap, sync::Arc, thread};
 
 pub struct Model {
@@ -58,15 +57,10 @@ impl Model {
 }
 
 pub fn dispatch(m: Model) {
-    thread::spawn(move || {
-        let local_exec = LocalExecutor::new();
-        block_on(run(local_exec, m))
-    });
+    task::spawn(async move { run(m).await });
 }
 
-async fn run<'exe>(exe: LocalExecutor<'exe>, m: Model) {
+async fn run(m: Model) {
     let jack = m.jack_handle.clone();
-    exe.spawn(async move {
-        // ...
-    });
+    println!("Model spawn!");
 }

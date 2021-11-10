@@ -1,4 +1,4 @@
-use smol::channel::{self, Receiver, RecvError, SendError, Sender};
+use async_std::channel::{self, Receiver, RecvError, SendError, Sender};
 
 #[derive(Debug)]
 pub struct Replier<R> {
