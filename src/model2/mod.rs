@@ -60,15 +60,13 @@ impl Model {
 pub fn dispatch(m: Model) {
     thread::spawn(move || {
         let local_exec = LocalExecutor::new();
-        block_on(local_exec.run(run(local_exec, m)))
+        block_on(run(local_exec, m))
     });
 }
 
-async fn run(exe: LocalExecutor, m: Model) {
-    let jack = m.jack.clone();
+async fn run<'exe>(exe: LocalExecutor<'exe>, m: Model) {
+    let jack = m.jack_handle.clone();
     exe.spawn(async move {
         // ...
-        
-        
     });
 }
