@@ -3,8 +3,8 @@
 mod cb_channel;
 mod error;
 mod model2;
-mod settings;
 mod rts;
+mod settings;
 
 // mod jack;
 // mod mixer;
@@ -24,12 +24,12 @@ fn main() {
 
     let jack = rts::jack::JackRuntime::start().unwrap();
     let model = model2::Model::new(jack, set);
-    
-    // if gtk::init().is_err() {
-    //     println!("Failed to start GTK, please ensure all dependancies are installed");
-    // }
 
-    // // due to a bug this button is basically panic on demand, however it does the job.
+    if gtk::init().is_err() {
+        println!("Failed to start GTK, please ensure all dependancies are installed");
+    }
+
+    // due to a bug this button is basically panic on demand, however it does the job.
     // ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
 
     // let model = model::ModelInner::new();

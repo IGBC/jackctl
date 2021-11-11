@@ -9,9 +9,10 @@ use async_std::{
     channel::{bounded, Receiver, Sender},
     task,
 };
-use jack::Client as JackClient;
-use jack::{AsyncClient, Client, InternalClientID};
-use std::{sync::Arc, thread};
+use jack::{AsyncClient, Client as JackClient, InternalClientID};
+use std::sync::Arc;
+
+use self::async_client::JackNotificationController;
 
 /// An easily clonable handle to the jack runtime
 #[derive(Clone)]
@@ -26,8 +27,8 @@ pub struct JackHandle {
 
 /// Jack server runtime and signalling state
 pub struct JackRuntime {
-    // Jack Event Reciever;
-    // a_client: AsyncClient<async_client::JackNotificationController, ()>,
+    /// Async jack client
+    a_client: AsyncClient<JackNotificationController, ()>,
     /// Receive jack commands
     cmd_rx: Receiver<JackCmd>,
     /// Send events to the model layer
@@ -44,17 +45,17 @@ impl JackRuntime {
         let (card_tx, card_rx) = cb_channel::bounded(4);
 
         // initialise jack
-        // let a_client = async_client::JackNotificationController::new(event_tx.clone());
-        // let (client, status) = JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER)?;
-        // let a_client = client.activate_async(a_client, ())?;
+        let a_client = async_client::JackNotificationController::new(event_tx.clone());
+        let (client, _) = JackClient::new("jackctl", jack::ClientOptions::NO_START_SERVER)?;
+        let a_client = client.activate_async(a_client, ())?;
 
         // Initialise and bootstrap the jack runtime
-        Self {
-            // a_client,
+        Arc::new(Self {
+            a_client,
             cmd_rx,
             event_tx,
             card_rx,
-        }
+        })
         .bootstrap();
 
         // Return a sending handle
@@ -66,20 +67,18 @@ impl JackRuntime {
     }
 
     /// Bootstrap a smol runtime on a dedicated thread
-    fn bootstrap(self) {
-        let rt_state = Arc::new(self);
-
+    fn bootstrap(self: &Arc<Self>) {
         println!("Running bootstrap...");
         {
-            let rt = Arc::clone(&rt_state);
+            let rt = Arc::clone(self);
             task::spawn(async move { cmd::spawn_handle(rt).await });
         }
         {
-            let rt = Arc::clone(&rt_state);
+            let rt = Arc::clone(self);
             task::spawn(async move { card::spawn_handle(rt).await });
         }
         {
-            let rt = Arc::clone(&rt_state);
+            let rt = Arc::clone(&self);
             task::spawn(async move { client::spawn_handle(rt).await });
         }
     }

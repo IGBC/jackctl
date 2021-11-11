@@ -4,17 +4,16 @@ use jack::Client;
 use std::sync::Arc;
 
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
-    println!("Client handle");
-
     // Loop until the card_tx senders drop
     while let Ok(cmd) = jack.cmd_rx.recv().await {
+        println!("Handling jack client event...");
         match cmd {
             JackCmd::ConnectPorts {
                 input,
                 output,
                 connect,
             } => {
-                // connect_ports(&jack.client, &input, &output, connect);
+                connect_ports(&jack.a_client.as_client(), &input, &output, connect);
                 println!("Connect ports...");
             }
             Shutdown => {

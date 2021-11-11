@@ -1,32 +1,43 @@
-use crate::rts::jack::JackRuntime;
 use crate::model2::events::JackCardAction;
+use crate::rts::jack::JackRuntime;
 use jack::{Client, InternalClientID};
 use std::sync::Arc;
 
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
-    println!("Card handle...");
-    
     // Loop until the card_tx senders drop
-    // while let Ok(card) = jack.card_rx.recv().await {
-    //     match card {
-    //         (JackCardAction::StartCard{
-    //             id,
-    //             name,
-    //             in_ports,
-    //             out_ports,
-    //             rate,
-    //             nperiods,
-    //             quality,
-    //         }, r) => {
-    //             let result = launch_card(&jack.client, &id, &name, rate, in_ports, out_ports, nperiods, quality);
-    //             r.reply(result);
-    //         }
-    //         (JackCardAction::StopCard{id}, r) => {
-    //             stop_card(&jack.client, id);
-    //             r.reply(Ok(0));
-    //         }
-    //     }
-    // }
+    while let Ok(card) = jack.card_rx.recv().await {
+        println!("Handling jack card event...");
+        match card {
+            (
+                JackCardAction::StartCard {
+                    id,
+                    name,
+                    in_ports,
+                    out_ports,
+                    rate,
+                    nperiods,
+                    quality,
+                },
+                r,
+            ) => {
+                let result = launch_card(
+                    &jack.a_client.as_client(),
+                    &id,
+                    &name,
+                    rate,
+                    in_ports,
+                    out_ports,
+                    nperiods,
+                    quality,
+                );
+                r.reply(result).await.unwrap();
+            }
+            (JackCardAction::StopCard { id }, r) => {
+                stop_card(&jack.a_client.as_client(), id);
+                r.reply(Ok(0)).await.unwrap();
+            }
+        }
+    }
 }
 
 fn launch_card(
