@@ -46,7 +46,7 @@ pub enum CardStatus {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MixerChannel {
     pub id: u32,
-    name: String,
+    pub name: String,
 
     pub is_playback: bool,
     pub has_switch: bool,

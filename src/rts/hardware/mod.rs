@@ -1,4 +1,4 @@
-use crate::model2::card::{CardId, ChannelId, Volume};
+use crate::model2::card::{CardConfig, CardId, ChannelId, MixerChannel, Volume};
 
 //ifconfig is linux
 mod alsa_card;
@@ -8,6 +8,7 @@ pub use alsa_card::AlsaHandle as HardwareHandle;
 // ifconfig is mac
 // mod coraudio;
 
+#[derive(Debug)]
 pub enum HardwareCmd {
     SetMixerVolume {
         card: CardId,
@@ -22,7 +23,15 @@ pub enum HardwareCmd {
     },
 }
 
+#[derive(Debug)]
 pub enum HardwareEvent {
+    NewCardFound {
+        id: CardId,
+        capture: Option<CardConfig>,
+        playback: Option<CardConfig>,
+        mixerchannels: Vec<MixerChannel>,
+    },
+
     UpdateMixerVolume {
         card: CardId,
         channel: ChannelId,
@@ -36,4 +45,5 @@ pub enum HardwareEvent {
     },
 }
 
+#[derive(Debug)]
 pub enum HardwareCardAction {}

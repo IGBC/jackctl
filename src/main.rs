@@ -23,6 +23,7 @@ fn main() {
     println!("{:?}", set.r().app());
 
     let jack = rts::jack::JackRuntime::start().unwrap();
+    let _card_interface = rts::hardware::HardwareHandle::new();
     let model = model2::Model::new(jack, set);
 
     if gtk::init().is_err() {
