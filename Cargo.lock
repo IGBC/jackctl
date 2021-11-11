@@ -909,6 +909,7 @@ dependencies = [
  "dbus",
  "dbus-tree",
  "directories",
+ "futures",
  "gdk",
  "gio",
  "glib",

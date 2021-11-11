@@ -4,7 +4,7 @@ mod client;
 mod cmd;
 
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
-use crate::model2::events::{Event, JackCardAction, JackCmd};
+use crate::model2::events::{JackCardAction, JackCmd, JackEvent};
 use async_std::{
     channel::{bounded, Receiver, Sender},
     task,
@@ -20,7 +20,7 @@ pub struct JackHandle {
     /// Send commands to the jack runtime
     cmd_tx: Sender<JackCmd>,
     /// Receive events from the jack runtime
-    event_rx: Receiver<Event>,
+    event_rx: Receiver<JackEvent>,
     /// Send card actions to jack runtime with blocking ACK
     card_tx: ReturningSender<JackCardAction, Result<InternalClientID, jack::Error>>,
 }
@@ -32,7 +32,7 @@ impl JackHandle {
     }
 
     /// Wait for the next jack event
-    pub async fn next_event(&self) -> Option<Event> {
+    pub async fn next_event(&self) -> Option<JackEvent> {
         self.event_rx.recv().await.ok()
     }
 
@@ -52,7 +52,7 @@ pub struct JackRuntime {
     /// Receive jack commands
     cmd_rx: Receiver<JackCmd>,
     /// Send events to the model layer
-    event_tx: Sender<Event>,
+    event_tx: Sender<JackEvent>,
     /// Receive card commands
     card_rx: ReturningReceiver<JackCardAction, Result<InternalClientID, jack::Error>>,
 }

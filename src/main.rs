@@ -5,26 +5,18 @@ mod error;
 mod model2;
 mod rts;
 mod settings;
-
-// mod jack;
-// mod mixer;
-// mod model;
-// mod process_manager;
-// mod ui;
-
-// use gio::prelude::*;
-// use std::env::args;
+mod ui;
 
 fn main() {
     // Load and initialise settings first
     let dir = settings::scaffold();
     let set = settings::Settings::init(dir.config_dir()).unwrap();
 
-    println!("{:?}", set.r().app());
-
     let jack = rts::jack::JackRuntime::start().unwrap();
+    let ui = ui::create_ui();
+
     let _card_interface = rts::hardware::HardwareHandle::new();
-    let model = model2::Model::new(jack, set);
+    let model = model2::Model::new(jack, ui, set);
 
     if gtk::init().is_err() {
         println!("Failed to start GTK, please ensure all dependancies are installed");

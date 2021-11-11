@@ -1,7 +1,5 @@
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
-use crate::model2::card::{
-    CardConfig, CardId, ChannelCount, ChannelId, MixerChannel, SampleRate, Volume,
-};
+use crate::model2::card::{CardConfig, CardId, ChannelCount, MixerChannel, SampleRate, Volume};
 use alsa::card::Card;
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Mixer, Selem, SelemChannelId};
@@ -166,56 +164,48 @@ impl AlsaController {
                 }
             }
 
+            let mut events: Vec<HardwareEvent> = Vec::new();
+
             for card in self.known_cards.iter() {
                 match Mixer::new(&format!("hw:{}", card), false) {
                     Ok(mixer) => {
-                        // the compiler is complaining about this not being send. This is correct, as 
+                        // the compiler is complaining about this not being send. This is correct, as
                         // alsa is not thread safe. but we create the object (and therefore all the stuffystuff from inside the task so why does need to be send?)
                         for elem in mixer.iter() {
-                            let selem = Selem::new(elem).unwrap();
-                            if Self::has_switch(&selem) {
+                            if Self::has_switch(&Selem::new(elem).unwrap()) {
+                                let selem = Selem::new(elem).unwrap();
                                 let mute = Self::get_muting(Self::is_playback(&selem), &selem);
-                                self.event_tx
-                                    .send(HardwareEvent::UpdateMixerMute {
-                                        card: *card,
-                                        channel: selem.get_id().get_index(),
-                                        mute,
-                                    })
-                                    .await
-                                    .unwrap();
+                                let channel = selem.get_id().get_index();
+                                drop(selem);
+                                events.push(HardwareEvent::UpdateMixerMute {
+                                    card: *card,
+                                    channel,
+                                    mute,
+                                });
                             }
 
+                            let selem = Selem::new(elem).unwrap();
                             let volume = Self::get_volume(Self::is_playback(&selem), &selem);
-                            self.event_tx
-                                .send(HardwareEvent::UpdateMixerVolume {
-                                    card: *card,
-                                    channel: selem.get_id().get_index(),
-                                    volume,
-                                })
-                                .await
-                                .unwrap();
+                            let channel = selem.get_id().get_index();
+                            drop(selem);
+                            events.push(HardwareEvent::UpdateMixerVolume {
+                                card: *card,
+                                channel,
+                                volume,
+                            });
                         }
                     }
                     Err(e) => {
                         // OK card is gone, we expected this eventually;
                         eprintln!("card{}: {}", card, e);
-                        self.event_tx
-                            .send(HardwareEvent::DropCard { id: *card })
-                            .await
-                            .unwrap();
+                        events.push(HardwareEvent::DropCard { id: *card });
                     }
                 }
             }
 
-            //     else {
-
-            //         self.event_tx.send(HardwareEvent::UpdateMixerVolume{
-            //             card: id,
-            //             channel:
-
-            //         }).await.unwrap();
-            //     }
-            // }
+            for e in events.into_iter() {
+                self.event_tx.send(e).await.unwrap();
+            }
         }
     }
 

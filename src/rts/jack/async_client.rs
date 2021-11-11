@@ -1,15 +1,15 @@
-use crate::model2::events::Event;
-use crate::model2::port::{Port, PortDirection, PortType};
+use crate::model2::events::JackEvent;
+use crate::model2::port::{PortDirection, PortType};
 use async_std::channel::Sender;
 use jack::Error as JackError;
 use jack::{NotificationHandler, Port as JackPort, PortFlags, PortId, Unowned};
 
 pub struct JackNotificationController {
-    pipe: Sender<Event>,
+    pipe: Sender<JackEvent>,
 }
 
 impl JackNotificationController {
-    pub fn new(pipe: Sender<Event>) -> Self {
+    pub fn new(pipe: Sender<JackEvent>) -> Self {
         Self { pipe }
     }
 
@@ -30,7 +30,7 @@ impl JackNotificationController {
         Ok((port_type, port_dir))
     }
 
-    fn sync_send(&mut self, e: Event) {
+    fn sync_send(&mut self, e: JackEvent) {
         todo!()
         // this needs to get wrapped up in blocking magic because NotificationController isn't async
         // self.pipe.send(e).await.unwrap();
@@ -76,10 +76,10 @@ impl NotificationHandler for JackNotificationController {
             //     };
 
             //     let e = match pt {
-            //         (PortType::Audio, PortDirection::Input) => Event::AddAudioInput(port),
-            //         (PortType::Audio, PortDirection::Output) => Event::AddAudioOutput(port),
-            //         (PortType::Midi, PortDirection::Input) => Event::AddMidiInput(port),
-            //         (PortType::Midi, PortDirection::Output) => Event::AddMidiOutput(port),
+            //         (PortType::Audio, PortDirection::Input) => JackEvent::AddAudioInput(port),
+            //         (PortType::Audio, PortDirection::Output) => JackEvent::AddAudioOutput(port),
+            //         (PortType::Midi, PortDirection::Input) => JackEvent::AddMidiInput(port),
+            //         (PortType::Midi, PortDirection::Output) => JackEvent::AddMidiOutput(port),
             //         (PortType::Unknown(f), _) => {
             //             println!("Unknown port format \"{}\" for port {}", f, name);
             //             return;
@@ -87,7 +87,7 @@ impl NotificationHandler for JackNotificationController {
             //     };
             //     self.sync_send(e);
             // } else {
-            //     self.sync_send(Event::DelPort(port_id));
+            //     self.sync_send(JackEvent::DelPort(port_id));
         }
     }
 
@@ -118,15 +118,15 @@ impl NotificationHandler for JackNotificationController {
             port_id_a, port_id_b, are_connected
         );
         if are_connected {
-            self.sync_send(Event::AddConnection(port_id_b, port_id_a));
+            self.sync_send(JackEvent::AddConnection(port_id_b, port_id_a));
         } else {
-            self.sync_send(Event::DelConnection(port_id_b, port_id_a));
+            self.sync_send(JackEvent::DelConnection(port_id_b, port_id_a));
         }
     }
 
     fn xrun(&mut self, _: &jack::Client) -> jack::Control {
         eprintln!("EVENT: XRun");
-        self.sync_send(Event::XRun);
+        self.sync_send(JackEvent::XRun);
         jack::Control::Continue
     }
 }
