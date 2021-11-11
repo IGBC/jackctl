@@ -11,14 +11,16 @@ use self::{
     audio::AudioGroups,
     card::{Card, CardId},
     con::Connections,
+    events::JackEvent,
     midi::MidiGroups,
 };
-use crate::{rts::jack::JackHandle, settings::Settings};
+use crate::{rts::jack::JackHandle, settings::Settings, ui::UiHandle};
 use async_std::task;
-use std::{collections::BTreeMap, sync::Arc, thread};
+use std::{collections::BTreeMap, sync::Arc};
 
 pub struct Model {
     jack_handle: JackHandle,
+    ui_handle: UiHandle,
     settings: Arc<Settings>,
 
     x_runs: u32,
@@ -60,7 +62,11 @@ pub fn dispatch(m: Model) {
     task::spawn(async move { run(m).await });
 }
 
-async fn run(m: Model) {
-    let jack = m.jack_handle.clone();
-    println!("Model spawn!");
+async fn run(mut m: Model) {
+    let jack_event_poll = m.jack_handle.next_event();
+    let ui_event_poll = m.ui_handle.next_event();
+
+    
 }
+
+async fn handle_jack_cmd(_: &mut Model, ev: JackEvent) {}

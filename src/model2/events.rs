@@ -32,13 +32,26 @@ pub enum JackCardAction {
     },
 }
 
-/// Event type represents methods that can be called on the model.
+/// UI event types executed on the model
 #[derive(Clone)]
-pub enum Event {
-    /// Called when the JACK Server overruns
-    XRun,
+pub enum UiEvent {
     /// Called to reset the overrun count. (For example when the user presses a button)
     ResetXruns,
+    /// Called when the user requests a mute operation on a channel
+    SetMuting(CardId, ChannelId, bool),
+    /// Called when the user requests a volume change on a channel
+    SetVolume(CardId, ChannelId, Volume),
+    /// Called when ALSA has new channel data,
+    UpdateChannel(CardId, ChannelId, Volume, bool),
+    /// Called to clear the dirty bit on a channel when a UI change has finished syncing
+    CleanChannel(CardId, ChannelId),
+}
+
+/// Jack event types executed on the model
+#[derive(Clone)]
+pub enum JackEvent {
+    /// Called when the JACK Server overruns
+    XRun,
     /// Called when jack has new server settings.
     JackSettings(f32, u64, u64, u64),
 
@@ -58,15 +71,6 @@ pub enum Event {
     FailStartCard(CardId),
     StopCard(CardId),
     ForgetCard(CardId),
-
-    /// Called when the user requests a mute operation on a channel
-    SetMuting(CardId, ChannelId, bool),
-    /// Called when the user requests a volume change on a channel
-    SetVolume(CardId, ChannelId, Volume),
-    /// Called when ALSA has new channel data,
-    UpdateChannel(CardId, ChannelId, Volume, bool),
-    /// Called to clear the dirty bit on a channel when a UI change has finished syncing
-    CleanChannel(CardId, ChannelId),
 
     AddAudioInput(Port),
     AddAudioOutput(Port),

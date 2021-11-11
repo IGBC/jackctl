@@ -5,22 +5,12 @@ mod error;
 mod model2;
 mod rts;
 mod settings;
-
-// mod jack;
-// mod mixer;
-// mod model;
-// mod process_manager;
-// mod ui;
-
-// use gio::prelude::*;
-// use std::env::args;
+mod ui;
 
 fn main() {
     // Load and initialise settings first
     let dir = settings::scaffold();
     let set = settings::Settings::init(dir.config_dir()).unwrap();
-
-    println!("{:?}", set.r().app());
 
     let jack = rts::jack::JackRuntime::start().unwrap();
     let _card_interface = rts::hardware::HardwareHandle::new();
@@ -29,6 +19,8 @@ fn main() {
     if gtk::init().is_err() {
         println!("Failed to start GTK, please ensure all dependancies are installed");
     }
+
+    ui::create_ui();
 
     // due to a bug this button is basically panic on demand, however it does the job.
     // ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
