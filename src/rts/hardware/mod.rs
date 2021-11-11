@@ -32,6 +32,10 @@ pub enum HardwareEvent {
         mixerchannels: Vec<MixerChannel>,
     },
 
+    DropCard {
+        id: CardId,
+    },
+
     UpdateMixerVolume {
         card: CardId,
         channel: ChannelId,

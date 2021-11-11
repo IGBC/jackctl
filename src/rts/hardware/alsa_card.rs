@@ -165,6 +165,57 @@ impl AlsaController {
                     }
                 }
             }
+
+            for card in self.known_cards.iter() {
+                match Mixer::new(&format!("hw:{}", card), false) {
+                    Ok(mixer) => {
+                        // the compiler is complaining about this not being send. This is correct, as 
+                        // alsa is not thread safe. but we create the object (and therefore all the stuffystuff from inside the task so why does need to be send?)
+                        for elem in mixer.iter() {
+                            let selem = Selem::new(elem).unwrap();
+                            if Self::has_switch(&selem) {
+                                let mute = Self::get_muting(Self::is_playback(&selem), &selem);
+                                self.event_tx
+                                    .send(HardwareEvent::UpdateMixerMute {
+                                        card: *card,
+                                        channel: selem.get_id().get_index(),
+                                        mute,
+                                    })
+                                    .await
+                                    .unwrap();
+                            }
+
+                            let volume = Self::get_volume(Self::is_playback(&selem), &selem);
+                            self.event_tx
+                                .send(HardwareEvent::UpdateMixerVolume {
+                                    card: *card,
+                                    channel: selem.get_id().get_index(),
+                                    volume,
+                                })
+                                .await
+                                .unwrap();
+                        }
+                    }
+                    Err(e) => {
+                        // OK card is gone, we expected this eventually;
+                        eprintln!("card{}: {}", card, e);
+                        self.event_tx
+                            .send(HardwareEvent::DropCard { id: *card })
+                            .await
+                            .unwrap();
+                    }
+                }
+            }
+
+            //     else {
+
+            //         self.event_tx.send(HardwareEvent::UpdateMixerVolume{
+            //             card: id,
+            //             channel:
+
+            //         }).await.unwrap();
+            //     }
+            // }
         }
     }
 
@@ -221,7 +272,7 @@ impl AlsaController {
 
                 if s.has_capture_volume() {
                     let (volume_min, volume_max) = s.get_capture_volume_range();
-                    let has_switch = s.has_playback_switch();
+                    let has_switch = s.has_capture_switch();
                     let switch = if has_switch {
                         Self::get_muting(true, &s)
                     } else {
@@ -282,75 +333,6 @@ impl AlsaController {
         }
     }
 
-    // fn update(&mut self) {
-    //     let card_ids: Vec<CardId> = self
-    //         .model
-    //         .lock()
-    //         .unwrap()
-    //         .cards
-    //         .keys()
-    //         .map(|x| *x)
-    //         .collect();
-    //     // first check for new cards
-    //     for alsa_card in CardIter::new().map(|x| x.unwrap()) {
-    //         if !card_ids.contains(&&alsa_card.get_index()) {
-    //             self.model
-    //                 .lock()
-    //                 .unwrap()
-    //                 .get_pipe()
-    //                 .send(Event::AddCard(
-    //                     alsa_card.get_index(),
-    //                     alsa_card.get_name().unwrap(),
-    //                 ))
-    //                 .unwrap();
-    //         }
-    //     }
-
-    //     let model = self.model.lock().unwrap();
-    //     let keys: Vec<&Card> = model.cards.values().collect();
-    //     for card in keys.iter() {
-    //         // todo map this into a proper match statement
-    //         match card.state {
-    //             CardStatus::Enum => {}
-    //             CardStatus::Active => match Mixer::new(&format!("hw:{}", card.id), false) {
-    //                 Ok(mixer) => {
-    //                     for (id, elem) in mixer.iter().enumerate() {
-    //                         let selem = Selem::new(elem).unwrap();
-    //                         match card.channels.get(&(id as u32)) {
-    //                             Some(channel) => {
-    //                                 if channel.dirty {
-
-    //                                 } else {
-    //                                     let sw = if channel.has_switch {
-    //                                         Self::get_muting(channel.is_playback, &selem)
-    //                                     } else {
-    //                                         false
-    //                                     };
-    //                                     let volume = Self::get_volume(channel.is_playback, &selem);
-    //                                     model
-    //                                         .get_pipe()
-    //                                         .send(Event::UpdateChannel(
-    //                                             card.id, channel.id, volume, sw,
-    //                                         ))
-    //                                         .unwrap();
-    //                                 }
-    //                             }
-    //                             None => (),
-    //                         }
-    //                     }
-    //                 }
-    //                 Err(e) => {
-    //                     eprintln!("Could not get mixer for card {}: {}", card.id, e);
-    //                     model.get_pipe().send(Event::StopCard(card.id)).unwrap();
-    //                 }
-    //             },
-    //             _ => {
-    //                 // Card is in a state that mixer doesn't need to worry about
-    //             }
-    //         }
-    //     }
-    // }
-
     fn attempt_playback_enumerate(card: CardId) -> alsa::Result<(Vec<SampleRate>, ChannelCount)> {
         // Open playback device
         let mut rates = Vec::new();
@@ -393,6 +375,30 @@ impl AlsaController {
             44100
         } else {
             *rates.last().unwrap()
+        }
+    }
+
+    fn is_playback(channel: &Selem) -> bool {
+        if channel.has_capture_volume() {
+            if channel.has_playback_volume() {
+                panic!("Channel is both capture and playback, you figure it out")
+            } else {
+                false
+            }
+        } else {
+            if channel.has_playback_volume() {
+                true
+            } else {
+                panic!("Channel is both neither capture nor playback, you figure it out")
+            }
+        }
+    }
+
+    fn has_switch(channel: &Selem) -> bool {
+        if Self::is_playback(channel) {
+            channel.has_playback_switch()
+        } else {
+            channel.has_capture_switch()
         }
     }
 
