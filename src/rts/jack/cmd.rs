@@ -1,5 +1,5 @@
-use crate::rts::jack::JackRuntime;
 use crate::model2::events::JackCmd;
+use crate::rts::jack::JackRuntime;
 use std::sync::Arc;
 
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
@@ -11,12 +11,10 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 input,
                 output,
                 connect,
-            } => {
-                
-            },
+            } => {}
             Shutdown => {
                 break;
-            },
+            }
         }
     }
 }
