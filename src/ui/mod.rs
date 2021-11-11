@@ -5,6 +5,7 @@ mod window;
 use crate::model2::events::UiEvent;
 use async_std::channel::Receiver;
 
+#[derive(Clone)]
 pub struct UiHandle {
     inner: Receiver<UiEvent>,
 }
@@ -15,8 +16,8 @@ impl UiHandle {
     }
 }
 
-pub fn create_ui() {
-    window::MainWindow {};
+pub fn create_ui() -> UiHandle {
+    todo!()
 }
 
 // mod about;
