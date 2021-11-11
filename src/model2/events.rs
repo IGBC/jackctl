@@ -16,7 +16,7 @@ pub enum JackCmd {
 }
 
 /// Actions taken on a soundcard
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum JackCardAction {
     StartCard {
         id: String,

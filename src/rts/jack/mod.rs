@@ -25,6 +25,26 @@ pub struct JackHandle {
     card_tx: ReturningSender<JackCardAction, Result<InternalClientID, jack::Error>>,
 }
 
+impl JackHandle {
+    /// Send a jack command to the associated task
+    pub async fn send_cmd(&self, cmd: JackCmd) {
+        self.cmd_tx.send(cmd).await.unwrap();
+    }
+
+    /// Wait for the next jack event
+    pub async fn next_event(&self) -> Option<Event> {
+        self.event_rx.recv().await.ok()
+    }
+
+    /// Send a card action and wait for the reply
+    pub async fn send_card_action(
+        &self,
+        action: JackCardAction,
+    ) -> Result<InternalClientID, jack::Error> {
+        self.card_tx.send(action).await.unwrap()
+    }
+}
+
 /// Jack server runtime and signalling state
 pub struct JackRuntime {
     /// Async jack client
