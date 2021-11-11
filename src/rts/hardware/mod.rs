@@ -1,13 +1,39 @@
-//ifconfig is linux
-mod alsa;
+use crate::model2::card::{CardId, ChannelId, Volume};
 
-pub use alsa::AlsaHandle as HardwareHandle;
+//ifconfig is linux
+mod alsa_card;
+
+pub use alsa_card::AlsaHandle as HardwareHandle;
 
 // ifconfig is mac
 // mod coraudio;
 
-pub enum HardwareCmd {}
+pub enum HardwareCmd {
+    SetMixerVolume {
+        card: CardId,
+        channel: ChannelId,
+        volume: Volume,
+    },
 
-pub enum HardwareEvent {}
+    SetMixerMute {
+        card: CardId,
+        channel: ChannelId,
+        mute: bool,
+    },
+}
 
-pub enum HarwareCardAction {}
+pub enum HardwareEvent {
+    UpdateMixerVolume {
+        card: CardId,
+        channel: ChannelId,
+        volume: Volume,
+    },
+
+    UpdateMixerMute {
+        card: CardId,
+        channel: ChannelId,
+        mute: bool,
+    },
+}
+
+pub enum HardwareCardAction {}

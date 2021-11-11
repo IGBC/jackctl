@@ -1,5 +1,6 @@
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
 use crate::model2::card::{CardId, ChannelCount, ChannelId, SampleRate, Volume};
+use alsa::card::Card;
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Mixer, Selem, SelemChannelId};
 use alsa::pcm::{HwParams, PCM};
@@ -8,8 +9,10 @@ use async_std::{
     channel::{bounded, Receiver, Sender},
     task,
 };
-use gtk::prelude::*;
-use std::cell::RefCell;
+
+use super::HardwareCmd;
+use super::HardwareEvent;
+use alsa::mixer::SelemId;
 use std::sync::Arc;
 
 const SAMPLE_RATES: [u32; 20] = [
@@ -37,19 +40,18 @@ const SAMPLE_RATES: [u32; 20] = [
 
 pub struct AlsaHandle {
     /// Send commands to the ALSA runtime
-    cmd_tx: Sender<super::HardwareCmd>,
+    cmd_tx: Sender<HardwareCmd>,
     /// Receive events from the ALSA runtime
-    event_rx: Receiver<super::HarwareEvent>,
+    event_rx: Receiver<HardwareEvent>,
     /// Send card actions to ALSA runtime with blocking ACK
     card_tx: ReturningSender<super::HardwareCardAction, ()>,
 }
-
 
 pub struct AlsaController {
     /// Send commands to the ALSA runtime
     cmd_rx: Receiver<super::HardwareCmd>,
     /// Receive events from the ALSA runtime
-    event_tx: Sender<super::HarwareEvent>,
+    event_tx: Sender<super::HardwareEvent>,
     /// Send card actions to ALSA runtime with blocking ACK
     card_rx: ReturningReceiver<super::HardwareCardAction, ()>,
 }
@@ -65,7 +67,8 @@ impl AlsaHandle {
             cmd_rx,
             card_rx,
             event_tx,
-        }).bootstrap();
+        })
+        .bootstrap();
 
         Self {
             event_rx,
@@ -95,7 +98,31 @@ impl AlsaController {
     async fn do_cmd(self: Arc<Self>) {
         while let Ok(event) = self.cmd_rx.recv().await {
             match event {
+                HardwareCmd::SetMixerVolume {
+                    card,
+                    channel,
+                    volume,
+                } => {
+                    let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
+                    let selemid = SelemId::new("", channel);
+                    let selem = mixer.find_selem(&selemid).unwrap();
+                    let playback = selem.has_playback_volume();
 
+                    Self::set_volume(playback, &selem, volume);
+                }
+
+                HardwareCmd::SetMixerMute {
+                    card,
+                    channel,
+                    mute,
+                } => {
+                    let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
+                    let selemid = SelemId::new("", channel);
+                    let selem = mixer.find_selem(&selemid).unwrap();
+                    let playback = selem.has_playback_switch();
+
+                    Self::set_muting(playback, &selem, mute);
+                }
             }
         }
     }
@@ -112,9 +139,7 @@ impl AlsaController {
 
     async fn respond_card(self: Arc<Self>) {
         while let Ok(event) = self.card_rx.recv().await {
-            match event {
-
-            }
+            match event {}
         }
     }
 
@@ -232,22 +257,7 @@ impl AlsaController {
     //                         match card.channels.get(&(id as u32)) {
     //                             Some(channel) => {
     //                                 if channel.dirty {
-    //                                     if channel.has_switch {
-    //                                         Self::set_muting(
-    //                                             channel.is_playback,
-    //                                             &selem,
-    //                                             channel.switch,
-    //                                         );
-    //                                     }
-    //                                     Self::set_volume(
-    //                                         channel.is_playback,
-    //                                         &selem,
-    //                                         channel.volume,
-    //                                     );
-    //                                     model
-    //                                         .get_pipe()
-    //                                         .send(Event::CleanChannel(card.id, channel.id))
-    //                                         .unwrap();
+
     //                                 } else {
     //                                     let sw = if channel.has_switch {
     //                                         Self::get_muting(channel.is_playback, &selem)
