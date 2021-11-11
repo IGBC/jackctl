@@ -2,6 +2,7 @@ mod async_client;
 mod card;
 mod client;
 mod cmd;
+mod server;
 
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
 use crate::model2::events::{JackCardAction, JackCmd, JackEvent};
@@ -11,8 +12,8 @@ use async_std::{
 };
 use jack::{AsyncClient, Client as JackClient, InternalClientID};
 use std::sync::Arc;
-
 use self::async_client::JackNotificationController;
+use self::server::JackServer;
 
 /// An easily clonable handle to the jack runtime
 #[derive(Clone)]
@@ -47,6 +48,8 @@ impl JackHandle {
 
 /// Jack server runtime and signalling state
 pub struct JackRuntime {
+    /// reference for the jack server, server will stop when dropped
+    server: JackServer,
     /// Async jack client
     a_client: AsyncClient<JackNotificationController, ()>,
     /// Receive jack commands
@@ -59,6 +62,9 @@ pub struct JackRuntime {
 
 impl JackRuntime {
     pub fn start() -> Result<JackHandle, jack::Error> {
+        // start the server first
+        let server = server::JackServer::new();
+
         // Open the channels
         let (event_tx, event_rx) = bounded(4);
         let (cmd_tx, cmd_rx) = bounded(4);
@@ -71,6 +77,7 @@ impl JackRuntime {
 
         // Initialise and bootstrap the jack runtime
         Arc::new(Self {
+            server,
             a_client,
             cmd_rx,
             event_tx,

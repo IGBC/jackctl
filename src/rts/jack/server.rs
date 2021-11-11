@@ -1,29 +1,23 @@
-use crate::model::Model;
 use psutil::process;
-use std::cell::RefCell;
 use std::panic;
 use std::process::abort;
 use std::process::{Child, Command, Stdio};
-use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
+use once_cell::sync::OnceCell;
 
-pub struct ProcessManager {
+pub struct JackServer {
     jack_process: Option<Child>,
 }
 
-static mut MUT_JACKCTL_SPAWNED_SERVER: bool = false;
+static JACKCTL_SPAWNED_SERVER: OnceCell<bool> = OnceCell::new();
 
 fn panic_kill(info: &panic::PanicInfo) -> ! {
     // logs "panicked at '$reason', src/main.rs:27:4" to the host stderr
     eprintln!("{}", info);
 
-    eprintln!("Killing children (violently)");
-    // We're throwing the results away cos this is a panic handler... what are we gonna do if it fails?!
-    let _ = Command::new("killall").arg("-9").arg("alsa_in").spawn();
-    let _ = Command::new("killall").arg("-9").arg("alsa_out").spawn();
     unsafe {
-        if MUT_JACKCTL_SPAWNED_SERVER {
+        if *JACKCTL_SPAWNED_SERVER.get().unwrap_or(&false) {
             eprintln!("Killing Local Server");
             let _ = Command::new("killall").arg("-9").arg("jackd").spawn();
         }
@@ -32,8 +26,8 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
     abort();
 }
 
-impl ProcessManager {
-    pub fn new(_model: Model) -> Rc<RefCell<Self>> {
+impl JackServer {
+    pub fn new() -> Self {
         panic::set_hook(Box::new(|pi| {
             panic_kill(pi);
         }));
@@ -51,17 +45,13 @@ impl ProcessManager {
                 .spawn()
                 .expect("Failed to start jack server");
 
-            //wait for jack to start,
-            unsafe {
-                MUT_JACKCTL_SPAWNED_SERVER = true;
-            }
             thread::sleep(Duration::from_secs(1));
             Some(jack_proc)
         };
 
-        let this = Rc::new(RefCell::new(Self { jack_process }));
+        JACKCTL_SPAWNED_SERVER.set(jack_process.is_some()).unwrap();
 
-        this
+        Self { jack_process }
     }
 
     pub fn end(&mut self) {
@@ -72,6 +62,13 @@ impl ProcessManager {
             }
             None => Ok(()),
         };
+        self.jack_process = None;
+    }
+}
+
+impl Drop for JackServer {
+    fn drop(&mut self) {
+        self.end();
     }
 }
 

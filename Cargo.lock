@@ -916,6 +916,7 @@ dependencies = [
  "gtk",
  "jack",
  "libappindicator",
+ "once_cell",
  "psutil",
  "regex",
  "serde",
