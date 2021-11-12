@@ -1,10 +1,10 @@
+use once_cell::sync::OnceCell;
 use psutil::process;
 use std::panic;
 use std::process::abort;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdout, Command};
 use std::thread;
 use std::time::Duration;
-use once_cell::sync::OnceCell;
 
 pub struct JackServer {
     jack_process: Option<Child>,
@@ -27,7 +27,7 @@ fn panic_kill(info: &panic::PanicInfo) -> ! {
 }
 
 impl JackServer {
-    pub fn new() -> Self {
+    pub fn new(rate: u32, frames: u32, realtime: bool) -> Self {
         panic::set_hook(Box::new(|pi| {
             panic_kill(pi);
         }));
@@ -36,12 +36,33 @@ impl JackServer {
         let jack_process = if process_is_running("jackd") || process_is_running("jackdbus") {
             None
         } else {
-            println!("starting jackd");
+            // get the flag needed for realtime mode and a modifier for logging
+            let (r_flag, r_msg) = if realtime { ("-R", "") } else { ("-r", "out") };
+
+            println!(
+                "starting jackd at {}Hz @{} frames with{} realtime",
+                rate, frames, r_msg
+            );
             let jack_proc = Command::new("jackd")
                 // This magic incantation launches jack with no input or output ports at all
-                .args(["-r", "-d", "dummy", "-C", "0", "-P", "0"].iter())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
+                .args(
+                    [
+                        r_flag,
+                        "-d",
+                        "dummy",
+                        "-C",
+                        "0",
+                        "-P",
+                        "0",
+                        "-r",
+                        &rate.to_string(),
+                        "-p",
+                        &frames.to_string(),
+                    ]
+                    .iter(),
+                )
+                //.stdout(Stdio::piped())
+                //.stderr(Stdio::piped())
                 .spawn()
                 .expect("Failed to start jack server");
 
@@ -63,6 +84,20 @@ impl JackServer {
             None => Ok(()),
         };
         self.jack_process = None;
+    }
+
+    pub fn stderr(&mut self) -> Option<ChildStderr> {
+        match &mut self.jack_process {
+            Some(p) => p.stderr.take(),
+            None => None,
+        }
+    }
+
+    pub fn stdout(&mut self) -> Option<ChildStdout> {
+        match &mut self.jack_process {
+            Some(p) => p.stdout.take(),
+            None => None,
+        }
     }
 }
 

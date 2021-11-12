@@ -12,7 +12,7 @@ fn main() {
     let dir = settings::scaffold();
     let set = settings::Settings::init(dir.config_dir()).unwrap();
 
-    let jack = rts::jack::JackRuntime::start().unwrap();
+    let jack = rts::jack::JackRuntime::start(set.clone()).unwrap();
     let ui = ui::create_ui();
 
     let _card_interface = rts::hardware::HardwareHandle::new();
