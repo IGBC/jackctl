@@ -52,6 +52,10 @@ impl JackHandle {
 pub struct JackRuntime {
     /// reference for the jack server, server will stop when dropped
     server: JackServer,
+    /// Resample Quality fetched from settings on boot
+    resample_q: u32,
+    /// number of periods per frame, fetched from settings on boot
+    n_periods: u32,
     /// Async jack client
     a_client: AsyncClient<JackNotificationController, ()>,
     /// Receive jack commands
@@ -69,7 +73,7 @@ impl JackRuntime {
         let jack_settings = &app_settings.jack;
         let server = server::JackServer::new(
             jack_settings.sample_rate,
-            jack_settings.block_size,
+            jack_settings.period_size,
             jack_settings.realtime,
         );
 
@@ -90,6 +94,8 @@ impl JackRuntime {
             cmd_rx,
             event_tx,
             card_rx,
+            n_periods: jack_settings.n_periods,
+            resample_q: jack_settings.resample_q,
         })
         .bootstrap();
 

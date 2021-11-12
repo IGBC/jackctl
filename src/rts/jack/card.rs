@@ -15,8 +15,6 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                     in_ports,
                     out_ports,
                     rate,
-                    nperiods,
-                    quality,
                 },
                 r,
             ) => {
@@ -27,8 +25,8 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                     rate,
                     in_ports,
                     out_ports,
-                    nperiods,
-                    quality,
+                    jack.n_periods,
+                    jack.resample_q,
                 );
                 r.reply(result).await.unwrap();
             }

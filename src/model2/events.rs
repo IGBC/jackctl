@@ -24,8 +24,6 @@ pub enum JackCardAction {
         rate: u32,
         in_ports: u32,
         out_ports: u32,
-        nperiods: u32,
-        quality: u32,
     },
     StopCard {
         id: InternalClientID,

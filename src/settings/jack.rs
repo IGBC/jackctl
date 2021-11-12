@@ -11,10 +11,15 @@ pub struct JackSettings {
     pub run_mode: RunMode,
     /// Enable jack realtime mode
     pub realtime: bool,
-    /// Specify audio block size
-    pub block_size: u32,
+    /// Specify frames per period
+    pub period_size: u32,
+    /// periods of latency (in the hardware),
+    pub n_periods:u32,
     /// Specify server sample rate
     pub sample_rate: u32,
+    /// Quality at which to resample audio
+    pub resample_q: u32
+    
 }
 
 impl Default for JackSettings {
@@ -25,8 +30,10 @@ impl Default for JackSettings {
             spawn_mode: SpawnMode::SoftSpawn,
             run_mode: RunMode::Uninitialized,
             realtime: false,
-            block_size: 1024,
+            period_size: 1024,
+            n_periods: 2,
             sample_rate: 48000,
+            resample_q: 1,
         }
     }
 }
