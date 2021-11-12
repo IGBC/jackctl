@@ -3,7 +3,7 @@
 mod window;
 
 use crate::model2::events::UiEvent;
-use async_std::channel::Receiver;
+use async_std::channel::{bounded, Receiver, Sender};
 
 #[derive(Clone)]
 pub struct UiHandle {
@@ -12,12 +12,15 @@ pub struct UiHandle {
 
 impl UiHandle {
     pub async fn next_event(&self) -> Option<UiEvent> {
+        println!("Polling for ui event");
         self.inner.recv().await.ok()
     }
 }
 
-pub fn create_ui() -> UiHandle {
-    todo!()
+pub fn create_ui() -> (Sender<UiEvent>, UiHandle) {
+    let (tx, inner) = bounded(2);
+
+    (tx, UiHandle { inner })
 }
 
 // mod about;

@@ -14,14 +14,22 @@ use self::{
     events::{JackEvent, UiEvent},
     midi::MidiGroups,
 };
-use crate::{rts::jack::JackHandle, settings::Settings, ui::UiHandle};
+use crate::{
+    rts::{
+        hardware::{HardwareEvent, HardwareHandle},
+        jack::JackHandle,
+    },
+    settings::Settings,
+    ui::UiHandle,
+};
 use async_std::task;
-use futures::{future::FusedFuture, FutureExt};
+use futures::FutureExt;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub struct Model {
     jack_handle: JackHandle,
     ui_handle: UiHandle,
+    hw_handle: HardwareHandle,
     settings: Arc<Settings>,
 
     x_runs: u32,
@@ -42,10 +50,16 @@ pub struct Model {
 
 impl Model {
     /// Initialise a new model tree
-    pub fn new(jack_handle: JackHandle, ui_handle: UiHandle, settings: Arc<Settings>) -> Self {
+    pub fn start(
+        jack_handle: JackHandle,
+        ui_handle: UiHandle,
+        hw_handle: HardwareHandle,
+        settings: Arc<Settings>,
+    ) {
         Self {
             jack_handle,
             ui_handle,
+            hw_handle,
             settings,
             x_runs: 0,
             cpu_percent: 0.0,
@@ -57,19 +71,25 @@ impl Model {
             connections: Default::default(),
             cards: Default::default(),
         }
+        .dispatch()
     }
-}
 
-pub fn dispatch(m: Model) {
-    task::spawn(async move { run(m).await });
+    fn dispatch(self) {
+        task::spawn(async move {
+            run(self).await;
+            println!("Model run loop shut down");
+        });
+    }
 }
 
 async fn run(mut m: Model) {
     let jack_handle = m.jack_handle.clone();
     let ui_handle = m.ui_handle.clone();
+    let hw_handle = m.hw_handle.clone();
 
     let mut jack_event_poll = Box::pin(jack_handle.next_event().fuse());
     let mut ui_event_poll = Box::pin(ui_handle.next_event().fuse());
+    let mut hw_event_poll = Box::pin(hw_handle.next_event().fuse());
 
     futures::select! {
         ev = jack_event_poll  => match ev {
@@ -80,8 +100,13 @@ async fn run(mut m: Model) {
             Some(ev) => handle_ui_ev(&mut m, ev).await,
             None => return,
         },
+        ev = hw_event_poll  => match ev {
+            Some(ev) => handle_hw_ev(&mut m, ev).await,
+            None => return,
+        },
     }
 }
 
 async fn handle_jack_ev(_: &mut Model, ev: JackEvent) {}
 async fn handle_ui_ev(_: &mut Model, ev: UiEvent) {}
+async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {}

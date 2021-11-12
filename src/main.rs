@@ -12,11 +12,11 @@ fn main() {
     let dir = settings::scaffold();
     let set = settings::Settings::init(dir.config_dir()).unwrap();
 
-    let jack = rts::jack::JackRuntime::start(set.clone()).unwrap();
-    let ui = ui::create_ui();
+    let jack_if = rts::jack::JackRuntime::start(set.clone()).unwrap();
+    let card_if = rts::hardware::HardwareHandle::new();
+    let (_tx, ui_if) = ui::create_ui();
 
-    let _card_interface = rts::hardware::HardwareHandle::new();
-    let model = model2::Model::new(jack, ui, set);
+    model2::Model::start(jack_if, ui_if, card_if, set);
 
     if gtk::init().is_err() {
         println!("Failed to start GTK, please ensure all dependancies are installed");

@@ -35,6 +35,7 @@ impl JackHandle {
 
     /// Wait for the next jack event
     pub async fn next_event(&self) -> Option<JackEvent> {
+        println!("Polling for jack event");
         self.event_rx.recv().await.ok()
     }
 

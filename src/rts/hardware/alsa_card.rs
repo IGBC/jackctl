@@ -38,6 +38,7 @@ const SAMPLE_RATES: [u32; 20] = [
     384000, // DVD 8x (have never ever seen anything enumerate this fast)
 ];
 
+#[derive(Clone)]
 pub struct AlsaHandle {
     /// Send commands to the ALSA runtime
     cmd_tx: Sender<HardwareCmd>,
@@ -45,6 +46,13 @@ pub struct AlsaHandle {
     event_rx: Receiver<HardwareEvent>,
     /// Send card actions to ALSA runtime with blocking ACK
     card_tx: ReturningSender<super::HardwareCardAction, ()>,
+}
+
+impl AlsaHandle {
+    pub async fn next_event(&self) -> Option<HardwareEvent> {
+        println!("Polling for alsa event");
+        self.event_rx.recv().await.ok()
+    }
 }
 
 pub struct AlsaController {
