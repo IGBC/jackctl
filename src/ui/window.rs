@@ -2,7 +2,11 @@ use crate::{
     model2::events::UiEvent,
     ui::{utils, UiRuntime},
 };
-use gtk::{Application, Builder, Button, ButtonExt, Label, LabelExt, LevelBar, WidgetExt, Window};
+use gio::ApplicationExt;
+use gtk::{
+    Application, Builder, Button, ButtonExt, GtkWindowExt, Label, LabelExt, LevelBar, WidgetExt,
+    Window,
+};
 use std::sync::Arc;
 
 pub struct MainWindow {
@@ -28,6 +32,13 @@ impl MainWindow {
     fn setup_draw_hook(self: &Arc<Self>) {
         let this = Arc::clone(self);
         self.inner.connect_draw(move |_, _| this.poll_updates());
+    }
+
+    fn setup_application(self: &Arc<Self>, app: &Application) {
+        let this = Arc::clone(self);
+        app.connect_startup(move |app| {
+            this.inner.set_application(Some(app));
+        });
     }
 
     pub fn show(&self) {
@@ -97,5 +108,6 @@ pub(super) fn create(builder: &Builder, rt: UiRuntime) -> (Arc<MainWindow>, Appl
         .expect("Failed to initialise Gtk application!");
     let win = MainWindow::new(builder, rt);
     win.setup_draw_hook();
+    win.setup_application(&app);
     (win, app)
 }
