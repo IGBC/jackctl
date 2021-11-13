@@ -1,26 +1,73 @@
 //! Jackctl GTK UI module
 
+mod utils;
 mod window;
 
-use crate::model2::events::UiEvent;
+use window::MainWindow;
+
+use crate::model2::events::{UiCmd, UiEvent};
 use async_std::channel::{bounded, Receiver, Sender};
+use gtk::{Application, Builder};
+use std::sync::Arc;
+
+// const STYLE: &str = include_str!("../jackctl.css");
+const GLADEFILE: &str = include_str!("../jackctl.glade");
 
 #[derive(Clone)]
 pub struct UiHandle {
-    inner: Receiver<UiEvent>,
+    tx_cmd: Sender<UiCmd>,
+    rx_event: Receiver<UiEvent>,
 }
 
 impl UiHandle {
     pub async fn next_event(&self) -> Option<UiEvent> {
         println!("Polling for ui event");
-        self.inner.recv().await.ok()
+        self.rx_event.recv().await.ok()
     }
 }
 
-pub fn create_ui() -> (Sender<UiEvent>, UiHandle) {
-    let (tx, inner) = bounded(2);
+#[derive(Clone)]
+struct EventSender(Sender<UiEvent>);
 
-    (tx, UiHandle { inner })
+impl EventSender {
+    fn send(self, e: UiEvent) {
+        async_std::task::block_on(async move {
+            if let Err(_) = self.0.send(e.clone()).await {
+                println!("Failed to send event '{:?}'", e);
+            }
+        });
+    }
+}
+
+struct UiRuntime {
+    tx_event: Sender<UiEvent>,
+    rx_cmd: Receiver<UiCmd>,
+}
+impl UiRuntime {
+    fn sender(&self) -> EventSender {
+        EventSender(self.tx_event.clone())
+    }
+
+    fn new() -> (Self, UiHandle) {
+        let (tx_cmd, rx_cmd) = bounded(8);
+        let (tx_event, rx_event) = bounded(8);
+
+        (
+            UiRuntime { tx_event, rx_cmd },
+            UiHandle { tx_cmd, rx_event },
+        )
+    }
+}
+
+pub fn create_ui() -> (Arc<MainWindow>, Application, UiHandle) {
+    if gtk::init().is_err() {
+        println!("Failed to start GTK, please ensure all dependancies are installed");
+    }
+
+    let (rt, handle) = UiRuntime::new();
+    let builder = Builder::from_string(GLADEFILE);
+    let (win, app) = window::create(&builder, rt);
+    (win, app, handle)
 }
 
 // mod about;
@@ -50,9 +97,6 @@ pub fn create_ui() -> (Sender<UiEvent>, UiHandle) {
 // use std::path::Path;
 // use std::rc::Rc;
 // use std::sync::{Arc, Mutex};
-
-// const STYLE: &str = include_str!("../jackctl.css");
-// const GLADEFILE: &str = include_str!("../jackctl.glade");
 
 // struct MixerHandle {
 //     card_id: i32,

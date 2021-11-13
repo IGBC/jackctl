@@ -31,7 +31,7 @@ pub enum JackCardAction {
 }
 
 /// UI event types executed on the model
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum UiEvent {
     /// Called to reset the overrun count. (For example when the user presses a button)
     ResetXruns,
@@ -43,6 +43,14 @@ pub enum UiEvent {
     UpdateChannel(CardId, ChannelId, Volume, bool),
     /// Called to clear the dirty bit on a channel when a UI change has finished syncing
     CleanChannel(CardId, ChannelId),
+}
+
+#[derive(Debug)]
+pub enum UiCmd {
+    AddCard,
+    RemoveCard,
+    AddClient,
+    RemoveClient,
 }
 
 /// Jack event types executed on the model
