@@ -80,7 +80,7 @@ impl Model {
             println!("Model run loop shut down");
         });
     }
-} 
+}
 
 async fn run(mut m: Model) {
     let jack_handle = m.jack_handle.clone();

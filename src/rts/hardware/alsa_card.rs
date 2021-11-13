@@ -152,22 +152,24 @@ impl AlsaController {
                     // if we have not seen this card before then we enumerate it
                     match Self::enumerate_card(id) {
                         Ok(Some((capture, playback, mixerchannels))) => {
-                            match self.event_tx
+                            match self
+                                .event_tx
                                 .send(HardwareEvent::NewCardFound {
                                     id,
                                     capture,
                                     playback,
                                     mixerchannels,
                                 })
-                                .await {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        eprintln!("FATAL ERROR: ALSA Event tx - {}", e);
-                                        eprintln!("             The program should close here but is being allowed to");
-                                        eprintln!("             continue to enable ui development without a working model.");
-                                        eprintln!("             Please consider the program to be on fire and sinking"); 
-                                    },
+                                .await
+                            {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    eprintln!("FATAL ERROR: ALSA Event tx - {}", e);
+                                    eprintln!("             The program should close here but is being allowed to");
+                                    eprintln!("             continue to enable ui development without a working model.");
+                                    eprintln!("             Please consider the program to be on fire and sinking");
                                 }
+                            }
                         }
                         Ok(None) => {
                             eprintln!("Error: Card {} had no playback or capture channels", id);
@@ -229,7 +231,7 @@ impl AlsaController {
             match event {
                 (e, m) => {
                     println!("{:?}", (e, m));
-                    todo!();
+                    todo!("Implement Card Events");
                 }
             }
         }

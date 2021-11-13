@@ -31,10 +31,17 @@ impl JackNotificationController {
     }
 
     fn sync_send(&mut self, e: JackEvent) {
-        return;
-        todo!()
-        // this needs to get wrapped up in blocking magic because NotificationController isn't async
-        // self.pipe.send(e).await.unwrap();
+        async_std::task::block_on(async {
+            match self.pipe.send(e).await {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("FATAL ERROR: JACK Async Event tx - {}", e);
+                    eprintln!("             The program should close here but is being allowed to");
+                    eprintln!("             continue to enable ui development without a working model.");
+                    eprintln!("             Please consider the program to be on fire and sinking");
+                }
+            }
+        });
     }
 }
 

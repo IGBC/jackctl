@@ -14,12 +14,11 @@ pub struct JackSettings {
     /// Specify frames per period
     pub period_size: u32,
     /// periods of latency (in the hardware),
-    pub n_periods:u32,
+    pub n_periods: u32,
     /// Specify server sample rate
     pub sample_rate: u32,
     /// Quality at which to resample audio
-    pub resample_q: u32
-    
+    pub resample_q: u32,
 }
 
 impl Default for JackSettings {
