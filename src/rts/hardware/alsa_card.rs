@@ -152,15 +152,22 @@ impl AlsaController {
                     // if we have not seen this card before then we enumerate it
                     match Self::enumerate_card(id) {
                         Ok(Some((capture, playback, mixerchannels))) => {
-                            self.event_tx
+                            match self.event_tx
                                 .send(HardwareEvent::NewCardFound {
                                     id,
                                     capture,
                                     playback,
                                     mixerchannels,
                                 })
-                                .await
-                                .unwrap();
+                                .await {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        eprintln!("FATAL ERROR: ALSA Event tx - {}", e);
+                                        eprintln!("             The program should close here but is being allowed to");
+                                        eprintln!("             continue to enable ui development without a working model.");
+                                        eprintln!("             Please consider the program to be on fire and sinking"); 
+                                    },
+                                }
                         }
                         Ok(None) => {
                             eprintln!("Error: Card {} had no playback or capture channels", id);
@@ -272,12 +279,12 @@ impl AlsaController {
                     let (volume_min, volume_max) = s.get_capture_volume_range();
                     let has_switch = s.has_capture_switch();
                     let switch = if has_switch {
-                        Self::get_muting(true, &s)
+                        Self::get_muting(false, &s)
                     } else {
                         false
                     };
 
-                    let volume = Self::get_volume(true, &s);
+                    let volume = Self::get_volume(false, &s);
 
                     let mc = MixerChannel {
                         id: mixer_id,

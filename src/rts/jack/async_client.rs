@@ -31,6 +31,7 @@ impl JackNotificationController {
     }
 
     fn sync_send(&mut self, e: JackEvent) {
+        return;
         todo!()
         // this needs to get wrapped up in blocking magic because NotificationController isn't async
         // self.pipe.send(e).await.unwrap();
