@@ -98,18 +98,18 @@ impl AlsaHandle {
 impl AlsaController {
     fn bootstrap(self: &Arc<Self>) {
         println!("bootstrapping the alsas...");
-        // {
-        //     let rt = Arc::clone(self);
-        //     task::spawn(async move { rt.do_cmd().await });
-        // }
-        // {
-        //     let rt = Arc::clone(self);
-        //     task::spawn(async move { rt.do_event().await });
-        // }
-        // {
-        //     let rt = Arc::clone(&self);
-        //     task::spawn(async move { rt.respond_card().await });
-        // }
+        {
+            let rt = Arc::clone(self);
+            task::spawn(async move { rt.do_cmd().await });
+        }
+        {
+            let rt = Arc::clone(self);
+            task::spawn(async move { rt.do_event().await });
+        }
+        {
+            let rt = Arc::clone(&self);
+            task::spawn(async move { rt.respond_card().await });
+        }
     }
 
     async fn do_cmd(self: Arc<Self>) {

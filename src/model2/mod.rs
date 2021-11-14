@@ -53,23 +53,25 @@ async fn run(mut m: Model) {
     let ui_handle = m.ui_handle.clone();
     let hw_handle = m.hw_handle.clone();
 
-    let mut jack_event_poll = Box::pin(jack_handle.next_event().fuse());
-    let mut ui_event_poll = Box::pin(ui_handle.next_event().fuse());
-    let mut hw_event_poll = Box::pin(hw_handle.next_event().fuse());
+    loop {
+        let mut jack_event_poll = Box::pin(jack_handle.next_event().fuse());
+        let mut ui_event_poll = Box::pin(ui_handle.next_event().fuse());
+        let mut hw_event_poll = Box::pin(hw_handle.next_event().fuse());
 
-    futures::select! {
-        ev = jack_event_poll  => match ev {
-            Some(ev) => handle_jack_ev(&mut m, ev).await,
-            None => return,
-        },
-        ev = ui_event_poll  => match ev {
-            Some(ev) => handle_ui_ev(&mut m, ev).await,
-            None => return,
-        },
-        ev = hw_event_poll  => match ev {
-            Some(ev) => handle_hw_ev(&mut m, ev).await,
-            None => return,
-        },
+        futures::select! {
+            ev = jack_event_poll  => match ev {
+                Some(ev) => handle_jack_ev(&mut m, ev).await,
+                None => {println!("Channel jack dropped!"); return},
+            },
+            ev = ui_event_poll  => match ev {
+                Some(ev) => handle_ui_ev(&mut m, ev).await,
+                None => {println!("Channel ui dropped!"); return},
+            },
+            ev = hw_event_poll  => match ev {
+                Some(ev) => handle_hw_ev(&mut m, ev).await,
+                None => {println!("Channel hw dropped!"); return},
+            },
+        }
     }
 }
 

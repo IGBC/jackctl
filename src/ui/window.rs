@@ -11,12 +11,15 @@ use gtk::{
     Application, Builder, Button, ButtonExt, CssProviderExt, GtkWindowExt, Label, LabelExt,
     LevelBar, ModelButton, WidgetExt, Window,
 };
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 pub struct MainWindow {
     inner: Window,
     rt: UiRuntime,
-    labels: Labels,
+    labels: Arc<Labels>,
     pages: Pages,
     audio_matrix: AudioMatrix,
 }
@@ -117,6 +120,7 @@ impl MainWindow {
                     println!("Unknown port type!");
                 }
             },
+            UiCmd::IncrementXRun => self.labels.increment_xruns(),
             _ => {}
         }
 
@@ -130,6 +134,7 @@ struct Labels {
     // xruns display
     xruns_label: Label,
     xruns_btn: Button,
+    xruns_ctr: AtomicUsize,
 
     // cpu usage display
     cpu_label: Label,
@@ -142,25 +147,56 @@ struct Labels {
 }
 
 impl Labels {
-    fn new(builder: &Builder, _rt: &UiRuntime) -> Self {
-        let this = Self {
+    fn new(builder: &Builder, _rt: &UiRuntime) -> Arc<Self> {
+        let this = Arc::new(Self {
+            // xruns ui state
             xruns_label: utils::get_object(builder, "label.xruns.maindialog"),
             xruns_btn: utils::get_object(builder, "button.xruns.maindialog"),
+            xruns_ctr: AtomicUsize::new(0),
+
+            // cpu labels
             cpu_label: utils::get_object(builder, "label.cpu.maindialog"),
             cpu_mtr: utils::get_object(builder, "meter.cpu.maindialog"),
+
+            // jack performance stats
             perf_rate: utils::get_object(&builder, "samplerate.performance.maindialog"),
             perf_frames: utils::get_object(&builder, "wordsize.performance.maindialog"),
             perf_latency: utils::get_object(&builder, "latency.performance.maindialog"),
-        };
+        });
 
-        // Setup various ui callbacks
-        this.xruns_label.set_markup(&format!("{} XRuns", "N.D."));
+        // Setup XRuns logic
+        this.reset_xruns();
+        let this_ = Arc::clone(&this);
         this.xruns_btn.connect_clicked(move |icon| {
-            // TODO: make this work and not make it explode booya
+            this_.reset_xruns();
             icon.hide();
         });
 
         this
+    }
+
+    /// Reset the xruns counter and update the label
+    fn reset_xruns(self: &Arc<Self>) {
+        self.xruns_ctr.store(0, Ordering::Relaxed);
+        self.xruns_label.set_markup(&format!("N.D. XRuns"));
+    }
+
+    /// Increment xruns counter and update the label
+    fn increment_xruns(self: &Arc<Self>) {
+        let val = self.xruns_ctr.fetch_add(1, Ordering::Relaxed);
+        self.xruns_label.set_markup(&format!("{} XRuns", val + 1));
+    }
+
+    fn update_rate(self: &Arc<Self>, rate: u64) {
+        self.perf_rate.set_markup(&format!("{}Hz", rate));
+    }
+
+    fn update_frames(self: &Arc<Self>, buf_size: u64) {
+        self.perf_frames.set_markup(&format!("{}w", buf_size));
+    }
+
+    fn update_latency(self: &Arc<Self>, latency: f32) {
+        self.perf_latency.set_markup(&format!("{}ms", latency));
     }
 }
 
