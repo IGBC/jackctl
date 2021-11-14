@@ -88,7 +88,14 @@ impl NotificationHandler for JackNotificationController {
             };
 
             // TODO: is this hardware?
-            let port = Port::new(client_name.to_owned(), port_name.to_owned(), port_id, tt, dir, false);
+            let port = Port::new(
+                client_name.to_owned(),
+                port_name.to_owned(),
+                port_id,
+                tt,
+                dir,
+                false,
+            );
             self.sync_send(JackEvent::AddPort(port));
         } else {
             self.sync_send(JackEvent::DelPort(port_id));

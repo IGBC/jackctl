@@ -190,8 +190,6 @@ impl AlsaController {
             for card in cards.iter() {
                 match Mixer::new(&format!("hw:{}", card), false) {
                     Ok(mixer) => {
-                        // the compiler is complaining about this not being send. This is correct, as
-                        // alsa is not thread safe. but we create the object (and therefore all the stuffystuff from inside the task so why does need to be send?)
                         for elem in mixer.iter() {
                             let selem = Selem::new(elem).unwrap();
 
@@ -253,6 +251,10 @@ impl AlsaController {
             for e in events.into_iter() {
                 self.event_tx.send(e).await.unwrap();
             }
+
+            // this rate limits updates to the mixers, we don't need to update the volumes
+            // at 100 FPS
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 
