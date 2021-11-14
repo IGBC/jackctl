@@ -1,7 +1,7 @@
 use crate::{
     model2::{
         events::{UiCmd, UiEvent},
-        port::PortType,
+        port::{Port, PortType},
     },
     ui::{matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
 };
@@ -99,17 +99,17 @@ impl MainWindow {
     async fn update(self: &Arc<Self>, cmd: UiCmd) {
         // TODO: handle more than one event at a time
         match cmd {
-            UiCmd::AddPort {
-                id,
-                tt,
-                is_hw,
-                input,
+            UiCmd::AddPort(Port {
                 client_name,
                 port_name,
-            } => match tt {
+                id,
+                tt,
+                dir,
+                is_hw,
+            }) => match tt {
                 PortType::Audio => {
                     self.audio_matrix
-                        .add_port(id, input, is_hw, client_name, port_name)
+                        .add_port(id, dir, is_hw, client_name, port_name)
                         .await
                 }
                 // PortType::Midi => self.midi_matrix.add_port(id, input, client_name, port_name),
@@ -142,7 +142,7 @@ struct Labels {
 }
 
 impl Labels {
-    fn new(builder: &Builder, rt: &UiRuntime) -> Self {
+    fn new(builder: &Builder, _rt: &UiRuntime) -> Self {
         let this = Self {
             xruns_label: utils::get_object(builder, "label.xruns.maindialog"),
             xruns_btn: utils::get_object(builder, "button.xruns.maindialog"),
@@ -155,9 +155,8 @@ impl Labels {
 
         // Setup various ui callbacks
         this.xruns_label.set_markup(&format!("{} XRuns", "N.D."));
-        let ev_tx = rt.sender();
         this.xruns_btn.connect_clicked(move |icon| {
-            ev_tx.clone().send(UiEvent::ResetXruns);
+            // TODO: make this work and not make it explode booya
             icon.hide();
         });
 

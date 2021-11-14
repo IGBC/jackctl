@@ -1,4 +1,7 @@
-use crate::ui::utils;
+use crate::{
+    model2::port::{JackPortType, PortDirection},
+    ui::utils,
+};
 use async_std::sync::RwLock;
 use gtk::{prelude::*, Align, Orientation, Separator};
 use std::{
@@ -10,7 +13,7 @@ use std::{
 struct PortStateElement {
     is_hw: bool,
     port: String,
-    id: usize,
+    id: JackPortType,
 }
 
 type PortStateMap = BTreeMap<String, BTreeSet<PortStateElement>>;
@@ -45,15 +48,15 @@ impl AudioMatrix {
     /// Add a new port to this audio matrix
     pub async fn add_port(
         &self,
-        id: usize,
-        input: bool,
+        id: JackPortType,
+        dir: PortDirection,
         is_hw: bool,
         client: String,
         port: String,
     ) {
-        let mut state = match input {
-            true => self._in.write().await,
-            false => self.out.write().await,
+        let mut state = match dir {
+            PortDirection::Input => self._in.write().await,
+            PortDirection::Output => self.out.write().await,
         };
 
         state

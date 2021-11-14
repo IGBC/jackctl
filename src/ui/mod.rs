@@ -26,6 +26,11 @@ impl UiHandle {
         println!("Polling for ui event");
         self.rx_event.recv().await.ok()
     }
+    pub async fn send_cmd(&self, cmd: UiCmd) {
+        if let Err(_) = self.tx_cmd.send(cmd).await {
+            println!("Failed to send UI command!");
+        }
+    }
 }
 
 #[derive(Clone)]
