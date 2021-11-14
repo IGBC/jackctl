@@ -32,10 +32,10 @@ pub enum JackCardAction {
 
 #[derive(Clone, Debug)]
 pub struct JackSettings {
-    cpu_percentage: f32,
-    sample_rate: u64,
-    buffer_size: u64,
-    latency: f32,
+    pub cpu_percentage: f32,
+    pub sample_rate: u64,
+    pub buffer_size: u64,
+    pub latency: f32,
 }
 
 #[derive(Clone, Debug)]

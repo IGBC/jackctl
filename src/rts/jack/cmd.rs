@@ -1,7 +1,22 @@
-use crate::model2::events::JackCmd;
+use crate::model2::events::{JackCmd, JackEvent, JackSettings};
 use crate::rts::jack::JackRuntime;
 use jack::Client;
 use std::sync::Arc;
+
+pub async fn do_event(jack: Arc<JackRuntime>) {
+    loop {
+        if jack.cmd_rx.is_closed() {
+            break;
+        }
+
+        let settings = interval_update(&jack);
+
+        jack.event_tx.send(JackEvent::JackSettings(settings)).await.unwrap();
+    
+        // this rate limits updates to the mixers, we don't need to update at 100 FPS
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
 
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
     // Loop until the card_tx senders drop
@@ -32,5 +47,20 @@ fn connect_ports(client: &Client, input: &str, output: &str, connect: bool) {
     };
     if result.is_err() {
         println!("Connection Error: {}", result.unwrap_err());
+    }
+}
+
+fn interval_update(jack: &Arc<JackRuntime>) -> JackSettings {
+    let client = jack.a_client.as_client();
+    let cpu_percentage = client.cpu_load();
+    let sample_rate = client.sample_rate() as u64;
+    let buffer_size = client.buffer_size() as u64;
+    let latency =  (buffer_size) as f32 / (sample_rate as f32 / 1000.0) * jack.n_periods as f32;
+
+    JackSettings {
+        cpu_percentage,
+        sample_rate,
+        buffer_size,
+        latency,
     }
 }

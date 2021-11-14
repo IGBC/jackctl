@@ -6,6 +6,7 @@ use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct JackServer {
     jack_process: Option<Child>,
 }
@@ -162,7 +163,7 @@ mod tests {
         let mutex = setup_test();
         let _lock = mutex.lock().unwrap();
         {
-            let server = launch_server();
+            let _ = launch_server();
             assert!(super::process_is_running("jackd"));
         }
         assert!(!super::process_is_running("jackd"));
@@ -190,7 +191,7 @@ mod tests {
     fn check_settings() {
         let mutex = setup_test();
         let _lock = mutex.lock().unwrap();
-        let server = launch_server();
+        let _ = launch_server();
         let (client, _) =
             Client::new("jackctl_tests", jack::ClientOptions::NO_START_SERVER).unwrap();
         assert_eq!(client.sample_rate(), 44100);
@@ -201,7 +202,7 @@ mod tests {
     fn check_no_dummy_ports() {
         let mutex = setup_test();
         let _lock = mutex.lock().unwrap();
-        let server = launch_server();
+        let _ = launch_server();
         let (client, _) =
             Client::new("jackctl_tests", jack::ClientOptions::NO_START_SERVER).unwrap();
         //get all ports

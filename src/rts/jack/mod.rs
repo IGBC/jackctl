@@ -1,6 +1,5 @@
 mod async_client;
 mod card;
-mod client;
 mod cmd;
 mod server;
 
@@ -49,6 +48,7 @@ impl JackHandle {
 }
 
 /// Jack server runtime and signalling state
+#[derive(Debug)]
 pub struct JackRuntime {
     /// reference for the jack server, server will stop when dropped
     server: JackServer,
@@ -120,7 +120,7 @@ impl JackRuntime {
         }
         {
             let rt = Arc::clone(&self);
-            task::spawn(async move { client::spawn_handle(rt).await });
+            task::spawn(async move { cmd::do_event(rt).await });
         }
     }
 }
