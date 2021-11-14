@@ -1,5 +1,3 @@
-
-
 //ifconfig is linux
 mod alsa_card;
 

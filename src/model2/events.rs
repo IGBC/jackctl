@@ -47,9 +47,9 @@ pub struct MuteCmd {
 
 #[derive(Clone, Debug)]
 pub struct VolumeCmd {
-    card: CardId,
-    channel: ChannelId,
-    volume: Volume,
+    pub card: CardId,
+    pub channel: ChannelId,
+    pub volume: Volume,
 }
 
 /// UI event types executed on the model

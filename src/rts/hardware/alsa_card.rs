@@ -10,8 +10,7 @@ use async_std::{
     task,
 };
 
-use super::HardwareCmd;
-use super::HardwareEvent;
+use crate::model2::events::{HardwareCmd, HardwareEvent, HardwareCardAction};
 use alsa::mixer::SelemId;
 use std::sync::Arc;
 
@@ -45,7 +44,7 @@ pub struct AlsaHandle {
     /// Receive events from the ALSA runtime
     event_rx: Receiver<HardwareEvent>,
     /// Send card actions to ALSA runtime with blocking ACK
-    card_tx: ReturningSender<super::HardwareCardAction, ()>,
+    card_tx: ReturningSender<HardwareCardAction, ()>,
 }
 
 impl AlsaHandle {
@@ -64,11 +63,11 @@ impl AlsaHandle {
 
 pub struct AlsaController {
     /// Send commands to the ALSA runtime
-    cmd_rx: Receiver<super::HardwareCmd>,
+    cmd_rx: Receiver<HardwareCmd>,
     /// Receive events from the ALSA runtime
-    event_tx: Sender<super::HardwareEvent>,
+    event_tx: Sender<HardwareEvent>,
     /// Send card actions to ALSA runtime with blocking ACK
-    card_rx: ReturningReceiver<super::HardwareCardAction, ()>,
+    card_rx: ReturningReceiver<HardwareCardAction, ()>,
     /// Cards we have already seen, for keeping track of enumeration
     known_cards: Vec<CardId>,
 }
@@ -116,30 +115,22 @@ impl AlsaController {
     async fn do_cmd(self: Arc<Self>) {
         while let Ok(event) = self.cmd_rx.recv().await {
             match event {
-                HardwareCmd::SetMixerVolume {
-                    card,
-                    channel,
-                    volume,
-                } => {
-                    let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
-                    let selemid = SelemId::new("", channel);
+                HardwareCmd::SetMixerVolume(volume) => {
+                    let mixer = Mixer::new(&format!("hw:{}", volume.card), false).unwrap();
+                    let selemid = SelemId::new("", volume.channel);
                     let selem = mixer.find_selem(&selemid).unwrap();
                     let playback = selem.has_playback_volume();
 
-                    Self::set_volume(playback, &selem, volume);
+                    Self::set_volume(playback, &selem, volume.volume);
                 }
 
-                HardwareCmd::SetMixerMute {
-                    card,
-                    channel,
-                    mute,
-                } => {
-                    let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
-                    let selemid = SelemId::new("", channel);
+                HardwareCmd::SetMixerMute(mute) => {
+                    let mixer = Mixer::new(&format!("hw:{}", mute.card), false).unwrap();
+                    let selemid = SelemId::new("", mute.channel);
                     let selem = mixer.find_selem(&selemid).unwrap();
                     let playback = selem.has_playback_switch();
 
-                    Self::set_muting(playback, &selem, mute);
+                    Self::set_muting(playback, &selem, mute.mute);
                 }
             }
         }

@@ -1,5 +1,5 @@
 use crate::model2::events::JackEvent;
-use crate::model2::port::{PortDirection, PortType};
+use crate::model2::port::{Port, PortDirection, PortType};
 use async_std::channel::Sender;
 use jack::Error as JackError;
 use jack::{NotificationHandler, Port as JackPort, PortFlags, PortId, Unowned};
@@ -75,29 +75,23 @@ impl NotificationHandler for JackNotificationController {
                 }
             };
 
-            // let port = JackPort::new(port_id, name.clone());
+            let names: Vec<&str> = name.split(":").collect();
+            let client_name = names[0];
+            let port_name = names[1];
 
-            //     let pt = match self.identify_port(&jack_port) {
-            //         Ok(pt) => pt,
-            //         Err(e) => {
-            //             eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
-            //             return;
-            //         }
-            //     };
+            let (tt, dir) = match self.identify_port(&jack_port) {
+                Ok(pt) => pt,
+                Err(e) => {
+                    eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
+                    return;
+                }
+            };
 
-            //     let e = match pt {
-            //         (PortType::Audio, PortDirection::Input) => JackEvent::AddAudioInput(port),
-            //         (PortType::Audio, PortDirection::Output) => JackEvent::AddAudioOutput(port),
-            //         (PortType::Midi, PortDirection::Input) => JackEvent::AddMidiInput(port),
-            //         (PortType::Midi, PortDirection::Output) => JackEvent::AddMidiOutput(port),
-            //         (PortType::Unknown(f), _) => {
-            //             println!("Unknown port format \"{}\" for port {}", f, name);
-            //             return;
-            //         },
-            //     };
-            //     self.sync_send(e);
-            // } else {
-            //     self.sync_send(JackEvent::DelPort(port_id));
+            // TODO: is this hardware?
+            let port = Port::new(client_name.to_owned(), port_name.to_owned(), port_id, tt, dir, false);
+            self.sync_send(JackEvent::AddPort(port));
+        } else {
+            self.sync_send(JackEvent::DelPort(port_id));
         }
     }
 
