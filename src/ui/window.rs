@@ -5,7 +5,7 @@ use crate::{
     },
     ui::{matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
 };
-use async_std::task::block_on;
+use async_std::{channel::TryRecvError, task::block_on};
 use gio::ApplicationExt;
 use gtk::{
     Application, Builder, Button, ButtonExt, CssProviderExt, GtkWindowExt, Label, LabelExt,
@@ -88,13 +88,20 @@ impl MainWindow {
     /// **Don't block this function!** Only handle a certain number of
     /// update events.
     fn poll_updates(self: &Arc<Self>) -> gtk::Inhibit {
-        // TODO: make this less dumb
-        let ev = match self.rt.rx_cmd.try_recv() {
-            Ok(ev) => ev,
-            _ => return gtk::Inhibit(false),
+        let evs = match self.rt.get_cmds(100) {
+            Some(evs) => evs,
+            None => return gtk::Inhibit(false),
         };
 
-        block_on(async move { self.update(ev).await });
+        block_on(async move {
+            // ==^-^== First handle all update events ==^-^==
+            for ev in evs {
+                self.update(ev).await;
+            }
+
+            // ==^-^== Then redraw all dirty elements ==^-^==
+            self.audio_matrix.draw().await;
+        });
 
         gtk::Inhibit(false)
     }
@@ -123,9 +130,6 @@ impl MainWindow {
             UiCmd::IncrementXRun => self.labels.increment_xruns(),
             _ => {}
         }
-
-        // ==^-^== Redraw all dirty elements ==^-^==
-        self.audio_matrix.draw().await;
     }
 }
 

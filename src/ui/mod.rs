@@ -56,6 +56,22 @@ impl UiRuntime {
         EventSender(self.tx_event.clone())
     }
 
+    /// Try to read events from the channel, up to a maximum number
+    ///
+    /// Returns `None` if the channel was empty or closed
+    fn get_cmds(&self, max: u8) -> Option<Vec<UiCmd>> {
+        let mut buf = vec![];
+        for _ in 0..max {
+            match self.rx_cmd.try_recv() {
+                Ok(ev) => buf.push(ev),
+                Err(_) if buf.is_empty() => return None,
+                Err(_) => break,
+            }
+        }
+
+        Some(buf)
+    }
+
     fn new() -> (Self, UiHandle) {
         let (tx_cmd, rx_cmd) = bounded(8);
         let (tx_event, rx_event) = bounded(8);
