@@ -22,10 +22,11 @@ pub struct Port {
 }
 
 /// Type of port
+#[derive(Debug)]
 pub enum PortType {
     Audio,
     Midi,
-    Unknown(String),
+    Unknown,
 }
 
 /// Direction of the port

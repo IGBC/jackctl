@@ -17,7 +17,7 @@ impl JackNotificationController {
         let port_type = match p.port_type()?.as_str() {
             "32 bit float mono audio" => PortType::Audio,
             "8 bit raw midi" => PortType::Midi,
-            e => PortType::Unknown(e.to_string()),
+            e => PortType::Unknown,
         };
 
         let flags = p.flags();
@@ -37,7 +37,9 @@ impl JackNotificationController {
                 Err(e) => {
                     eprintln!("FATAL ERROR: JACK Async Event tx - {}", e);
                     eprintln!("             The program should close here but is being allowed to");
-                    eprintln!("             continue to enable ui development without a working model.");
+                    eprintln!(
+                        "             continue to enable ui development without a working model."
+                    );
                     eprintln!("             Please consider the program to be on fire and sinking");
                 }
             }
