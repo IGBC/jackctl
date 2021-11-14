@@ -1,6 +1,6 @@
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
 use crate::model2::card::{CardConfig, CardId, ChannelCount, MixerChannel, SampleRate, Volume};
-use crate::model2::events::{HardwareCardAction, HardwareCmd, HardwareEvent};
+use crate::model2::events::{HardwareCardAction, HardwareCmd, HardwareEvent, MuteCmd, VolumeCmd};
 use alsa::card::Card;
 use alsa::card::Iter as CardIter;
 use alsa::mixer::SelemId;
@@ -198,44 +198,44 @@ impl AlsaController {
                                     let mute = Self::get_muting(false, &selem);
                                     let channel = selem.get_id().get_index();
                                     drop(selem);
-                                    events.push(HardwareEvent::UpdateMixerMute {
+                                    events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                                         card: *card,
                                         channel,
                                         mute,
-                                    });
+                                    }));
                                 }
 
                                 let selem = Selem::new(elem).unwrap();
                                 let volume = Self::get_volume(false, &selem);
                                 let channel = selem.get_id().get_index();
                                 drop(selem);
-                                events.push(HardwareEvent::UpdateMixerVolume {
+                                events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                                     card: *card,
                                     channel,
                                     volume,
-                                });
+                                }));
                             } else {
                                 if selem.has_playback_volume() {
                                     if Self::has_switch(&selem) {
                                         let mute = Self::get_muting(true, &selem);
                                         let channel = selem.get_id().get_index();
                                         drop(selem);
-                                        events.push(HardwareEvent::UpdateMixerMute {
+                                        events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                                             card: *card,
                                             channel,
                                             mute,
-                                        });
+                                        }));
                                     }
 
                                     let selem = Selem::new(elem).unwrap();
                                     let volume = Self::get_volume(true, &selem);
                                     let channel = selem.get_id().get_index();
                                     drop(selem);
-                                    events.push(HardwareEvent::UpdateMixerVolume {
+                                    events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                                         card: *card,
                                         channel,
                                         volume,
-                                    });
+                                    }));
                                 }
                             }
                         }

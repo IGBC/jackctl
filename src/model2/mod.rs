@@ -100,13 +100,11 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
                 .send_cmd(HardwareCmd::SetMixerVolume(volume))
                 .await
         }
-        UpdateChannel(card, channel, volume, b) => {}
-        CleanChannel(card, channel) => {}
     }
 }
 
 /// Events from the hardware runtime
-async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {
+async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
     println!("Selected HW EVENT");
     use HardwareEvent::*;
     match ev {
@@ -117,15 +115,11 @@ async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {
             mixerchannels,
         } => {}
         DropCard { id } => {}
-        UpdateMixerVolume {
-            card,
-            channel,
-            volume,
-        } => {}
-        UpdateMixerMute {
-            card,
-            channel,
-            mute,
-        } => {}
+        UpdateMixerVolume (volume) => {
+            m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await
+        }
+        UpdateMixerMute(mute) => {
+            m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await
+        }
     }
 }

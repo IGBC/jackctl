@@ -59,10 +59,6 @@ pub enum UiEvent {
     SetMuting(MuteCmd),
     /// Called when the user requests a volume change on a channel
     SetVolume(VolumeCmd),
-    /// Called when ALSA has new channel data,
-    UpdateChannel(CardId, ChannelId, Volume, bool),
-    /// Called to clear the dirty bit on a channel when a UI change has finished syncing
-    CleanChannel(CardId, ChannelId),
 }
 
 /// Commands from the model to manipulate the UI state
@@ -73,9 +69,9 @@ pub enum UiCmd {
     /// Delete a port
     DelPort(JackPortType),
     /// Changing volume on a channel
-    VolumeChange { id: ChannelId, vol: Volume },
+    VolumeChange(VolumeCmd),
     /// Toggle mute on a channel
-    MuteChange { id: ChannelId, val: bool },
+    MuteChange(MuteCmd),
     /// Increment the XRun count
     IncrementXRun,
     /// Update jack settings
@@ -122,17 +118,9 @@ pub enum HardwareEvent {
         id: CardId,
     },
 
-    UpdateMixerVolume {
-        card: CardId,
-        channel: ChannelId,
-        volume: Volume,
-    },
+    UpdateMixerVolume(VolumeCmd),
 
-    UpdateMixerMute {
-        card: CardId,
-        channel: ChannelId,
-        mute: bool,
-    },
+    UpdateMixerMute(MuteCmd),
 }
 
 #[derive(Clone, Debug)]
