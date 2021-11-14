@@ -4,19 +4,10 @@ pub mod card;
 pub mod events;
 pub mod port;
 
-use self::{
-    card::{Card, CardId},
-    events::{JackEvent, UiCmd, UiEvent},
-    port::Port,
-};
-use crate::{
-    rts::{
-        hardware::{HardwareEvent, HardwareHandle},
-        jack::JackHandle,
-    },
-    settings::Settings,
-    ui::UiHandle,
-};
+use self::card::{Card, CardId};
+use self::events::{HardwareCmd, HardwareEvent, JackEvent, UiCmd, UiEvent};
+use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
+use crate::{settings::Settings, ui::UiHandle};
 use async_std::task;
 use futures::FutureExt;
 use std::{collections::BTreeMap, sync::Arc};
@@ -96,15 +87,40 @@ async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
 }
 
 /// Events from the UI runtime
-async fn handle_ui_ev(_: &mut Model, ev: UiEvent) {
+async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
+    use UiEvent::*;
     match ev {
-        _ => {}
+        SetMuting(mute) => m.hw_handle.send_cmd(HardwareCmd::SetMixerMute(mute)).await,
+        SetVolume(volume) => {
+            m.hw_handle
+                .send_cmd(HardwareCmd::SetMixerVolume(volume))
+                .await
+        }
+        UpdateChannel(card, channel, volume, b) => {}
+        CleanChannel(card, channel) => {}
     }
 }
 
 /// Events from the hardware runtime
 async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {
+    use HardwareEvent::*;
     match ev {
-        _ => {}
+        NewCardFound {
+            id,
+            capture,
+            playback,
+            mixerchannels,
+        } => {}
+        DropCard { id } => {}
+        UpdateMixerVolume {
+            card,
+            channel,
+            volume,
+        } => {}
+        UpdateMixerMute {
+            card,
+            channel,
+            mute,
+        } => {}
     }
 }

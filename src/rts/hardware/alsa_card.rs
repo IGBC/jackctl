@@ -53,6 +53,13 @@ impl AlsaHandle {
         println!("Polling for alsa event");
         self.event_rx.recv().await.ok()
     }
+
+    // TODO: trait this
+    pub async fn send_cmd(&self, cmd: HardwareCmd) {
+        if let Err(_) = self.cmd_tx.send(cmd).await {
+            println!("Failed to send CMD to hardware runtime!");
+        }
+    }
 }
 
 pub struct AlsaController {

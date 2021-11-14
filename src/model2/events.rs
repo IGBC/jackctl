@@ -1,6 +1,6 @@
 use crate::{
-    model2::card::{CardId, ChannelId, Volume},
-    model2::port::{JackPortType, Port, PortDirection, PortType},
+    model2::card::{CardConfig, CardId, ChannelId, MixerChannel, Volume},
+    model2::port::{JackPortType, Port},
 };
 use jack::InternalClientID;
 
@@ -38,13 +38,27 @@ pub struct JackSettings {
     latency: f32,
 }
 
+#[derive(Clone, Debug)]
+pub struct MuteCmd {
+    pub card: CardId,
+    pub channel: ChannelId,
+    pub mute: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct VolumeCmd {
+    card: CardId,
+    channel: ChannelId,
+    volume: Volume,
+}
+
 /// UI event types executed on the model
 #[derive(Clone, Debug)]
 pub enum UiEvent {
     /// Called when the user requests a mute operation on a channel
-    SetMuting(CardId, ChannelId, bool),
+    SetMuting(MuteCmd),
     /// Called when the user requests a volume change on a channel
-    SetVolume(CardId, ChannelId, Volume),
+    SetVolume(VolumeCmd),
     /// Called when ALSA has new channel data,
     UpdateChannel(CardId, ChannelId, Volume, bool),
     /// Called to clear the dirty bit on a channel when a UI change has finished syncing
@@ -88,3 +102,38 @@ pub enum JackEvent {
     /// Delete a connection between ports
     DelConnection(JackPortType, JackPortType),
 }
+
+#[derive(Clone, Debug)]
+pub enum HardwareCmd {
+    SetMixerVolume(VolumeCmd),
+    SetMixerMute(MuteCmd),
+}
+
+#[derive(Clone, Debug)]
+pub enum HardwareEvent {
+    NewCardFound {
+        id: CardId,
+        capture: Option<CardConfig>,
+        playback: Option<CardConfig>,
+        mixerchannels: Vec<MixerChannel>,
+    },
+
+    DropCard {
+        id: CardId,
+    },
+
+    UpdateMixerVolume {
+        card: CardId,
+        channel: ChannelId,
+        volume: Volume,
+    },
+
+    UpdateMixerMute {
+        card: CardId,
+        channel: ChannelId,
+        mute: bool,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub enum HardwareCardAction {}
