@@ -18,11 +18,10 @@ fn main() {
 
     let jack_if = rts::jack::JackRuntime::start(set.clone()).unwrap();
     let card_if = rts::hardware::HardwareHandle::new();
-    let (win, app, ui_if) = ui::create_ui();
+    let (_win, app, ui_if) = ui::create_ui();
 
     Model::start(jack_if, ui_if, card_if, set);
 
-    win.show();
     app.run(&args().collect::<Vec<_>>());
 
     println!("Jackctl Exiting, Goodbye");

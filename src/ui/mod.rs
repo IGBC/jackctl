@@ -1,5 +1,7 @@
 //! Jackctl GTK UI module
 
+mod matrix;
+mod pages;
 mod utils;
 mod window;
 
@@ -10,7 +12,7 @@ use async_std::channel::{bounded, Receiver, Sender};
 use gtk::{Application, Builder};
 use std::sync::Arc;
 
-// const STYLE: &str = include_str!("../jackctl.css");
+const STYLE: &str = include_str!("../jackctl.css");
 const GLADEFILE: &str = include_str!("../jackctl.glade");
 
 #[derive(Clone)]
@@ -43,6 +45,7 @@ struct UiRuntime {
     tx_event: Sender<UiEvent>,
     rx_cmd: Receiver<UiCmd>,
 }
+
 impl UiRuntime {
     fn sender(&self) -> EventSender {
         EventSender(self.tx_event.clone())
@@ -66,7 +69,7 @@ pub fn create_ui() -> (Arc<MainWindow>, Application, UiHandle) {
 
     let (rt, handle) = UiRuntime::new();
     let builder = Builder::from_string(GLADEFILE);
-    let (win, app) = window::create(&builder, rt);
+    let (win, app) = window::create(builder, rt);
     (win, app, handle)
 }
 

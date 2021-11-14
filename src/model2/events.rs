@@ -1,6 +1,6 @@
 use crate::{
     model2::card::{CardConfig, CardId, ChannelId, MixerChannel, Volume},
-    model2::port::{JackPortType, Port},
+    model2::port::{JackPortType, Port, PortType},
 };
 use jack::InternalClientID;
 
@@ -45,12 +45,22 @@ pub enum UiEvent {
     CleanChannel(CardId, ChannelId),
 }
 
+/// Commands from the model to manipulate the UI state
 #[derive(Debug)]
 pub enum UiCmd {
-    AddCard,
-    RemoveCard,
-    AddClient,
-    RemoveClient,
+    /// Add a single port to the audio/ midi matrix
+    AddPort {
+        id: usize, // TODO: change for proper ID type
+        tt: PortType,
+        is_hw: bool,
+        input: bool,
+        client_name: String,
+        port_name: String,
+    },
+    /// Changing volume on a channel
+    VolumeChange { id: ChannelId, vol: Volume },
+    /// Toggle mute on a channel
+    MuteChange { id: ChannelId, val: bool },
 }
 
 /// Jack event types executed on the model
@@ -62,7 +72,7 @@ pub enum JackEvent {
     JackSettings(f32, u64, u64, u64),
 
     /// Called when the Model detects a new card to add to the model
-    AddCard(CardId, String),
+
     /// Called to Start Enumating the Card
     UseCard(CardId),
     DontUseCard(CardId),
