@@ -1,6 +1,6 @@
 use crate::{
-    model2::card::{CardConfig, CardId, ChannelId, MixerChannel, Volume},
-    model2::port::{JackPortType, Port, PortType},
+    model2::card::{CardId, ChannelId, Volume},
+    model2::port::{JackPortType, Port, PortDirection, PortType},
 };
 use jack::InternalClientID;
 
@@ -30,11 +30,17 @@ pub enum JackCardAction {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct JackSettings {
+    cpu_percentage: f32,
+    sample_rate: u64,
+    buffer_size: u64,
+    latency: f32,
+}
+
 /// UI event types executed on the model
 #[derive(Clone, Debug)]
 pub enum UiEvent {
-    /// Called to reset the overrun count. (For example when the user presses a button)
-    ResetXruns,
     /// Called when the user requests a mute operation on a channel
     SetMuting(CardId, ChannelId, bool),
     /// Called when the user requests a volume change on a channel
@@ -46,57 +52,39 @@ pub enum UiEvent {
 }
 
 /// Commands from the model to manipulate the UI state
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum UiCmd {
     /// Add a single port to the audio/ midi matrix
-    AddPort {
-        id: usize, // TODO: change for proper ID type
-        tt: PortType,
-        is_hw: bool,
-        input: bool,
-        client_name: String,
-        port_name: String,
-    },
+    AddPort(Port),
+    /// Delete a port
+    DelPort(JackPortType),
     /// Changing volume on a channel
     VolumeChange { id: ChannelId, vol: Volume },
     /// Toggle mute on a channel
     MuteChange { id: ChannelId, val: bool },
+    /// Increment the XRun count
+    IncrementXRun,
+    /// Update jack settings
+    JackSettings(JackSettings),
+    /// Add a connection between ports
+    AddConnection(JackPortType, JackPortType),
+    /// Delete a connection between ports
+    DelConnection(JackPortType, JackPortType),
 }
 
 /// Jack event types executed on the model
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum JackEvent {
     /// Called when the JACK Server overruns
     XRun,
     /// Called when jack has new server settings.
-    JackSettings(f32, u64, u64, u64),
-
-    /// Called when the Model detects a new card to add to the model
-
-    /// Called to Start Enumating the Card
-    UseCard(CardId),
-    DontUseCard(CardId),
-    FinishEnumerateCard(
-        CardId,
-        Option<CardConfig>,
-        Option<CardConfig>,
-        Vec<MixerChannel>,
-    ),
-    FailEnumerateCard(CardId),
-    FinishStartCard(CardId, u64),
-    FailStartCard(CardId),
-    StopCard(CardId),
-    ForgetCard(CardId),
-
-    AddAudioInput(Port),
-    AddAudioOutput(Port),
-    AddMidiInput(Port),
-    AddMidiOutput(Port),
-
-    // Called when its time to delete a port,
-    // 'Argument is port ID
+    JackSettings(JackSettings),
+    /// Add a port duh
+    AddPort(Port),
+    /// Delete a port
     DelPort(JackPortType),
-
+    /// Add a connection between ports
     AddConnection(JackPortType, JackPortType),
+    /// Delete a connection between ports
     DelConnection(JackPortType, JackPortType),
 }

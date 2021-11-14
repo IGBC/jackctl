@@ -1,28 +1,39 @@
+/// Port ID
 pub type JackPortType = u32;
 
-/// Struct wrapping all the groups (clients) in a model for a given port type
-#[derive(Default)]
-pub struct PortGroup {
-    groups: Vec<Group>,
-}
-
-/// Struct wrapping all the Ports in a group
-#[derive(Clone, Default)]
-pub struct Group {
-    name: String,
-    ports: Vec<Port>,
-}
-
 /// An individual port in the jack server, mapped to a unique (internal) id.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Port {
-    portname: String,
-    groupname: String,
-    id: JackPortType,
+    pub client_name: String,
+    pub port_name: String,
+    pub id: JackPortType,
+    pub tt: PortType,
+    pub dir: PortDirection,
+    pub is_hw: bool,
+}
+
+impl Port {
+    pub fn new(
+        client_name: String,
+        port_name: String,
+        id: JackPortType,
+        tt: PortType,
+        dir: PortDirection,
+        is_hw: bool,
+    ) -> Self {
+        Self {
+            client_name,
+            port_name,
+            id,
+            tt,
+            dir,
+            is_hw,
+        }
+    }
 }
 
 /// Type of port
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PortType {
     Audio,
     Midi,
@@ -30,6 +41,7 @@ pub enum PortType {
 }
 
 /// Direction of the port
+#[derive(Clone, Debug, PartialEq)]
 pub enum PortDirection {
     Input,
     Output,

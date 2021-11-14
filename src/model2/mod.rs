@@ -1,18 +1,13 @@
 //! New model abstraction
 
-pub mod audio;
 pub mod card;
-pub mod con;
 pub mod events;
-pub mod midi;
 pub mod port;
 
 use self::{
-    audio::AudioGroups,
     card::{Card, CardId},
-    con::Connections,
-    events::{JackEvent, UiEvent},
-    midi::MidiGroups,
+    events::{JackEvent, UiCmd, UiEvent},
+    port::Port,
 };
 use crate::{
     rts::{
@@ -32,19 +27,7 @@ pub struct Model {
     hw_handle: HardwareHandle,
     settings: Arc<Settings>,
 
-    x_runs: u32,
-    cpu_percent: f32,
-    sample_rate: u64,
-    buffer_size: u64,
-    latency: u64,
-
-    /// Audio I/O data
-    audio_groups: AudioGroups,
-    /// Midi I/O data
-    midi_groups: MidiGroups,
-    /// Actively patched connections
-    connections: Connections,
-    /// Card data map
+    /// Card data and state map
     cards: BTreeMap<CardId, Card>,
 }
 
@@ -61,14 +44,6 @@ impl Model {
             ui_handle,
             hw_handle,
             settings,
-            x_runs: 0,
-            cpu_percent: 0.0,
-            sample_rate: 0,
-            buffer_size: 0,
-            latency: 0,
-            audio_groups: Default::default(),
-            midi_groups: Default::default(),
-            connections: Default::default(),
             cards: Default::default(),
         }
         .dispatch()
@@ -107,6 +82,29 @@ async fn run(mut m: Model) {
     }
 }
 
-async fn handle_jack_ev(_: &mut Model, ev: JackEvent) {}
-async fn handle_ui_ev(_: &mut Model, ev: UiEvent) {}
-async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {}
+/// Events from the jack runtime
+async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
+    use JackEvent::*;
+    match ev {
+        XRun => m.ui_handle.send_cmd(UiCmd::IncrementXRun).await,
+        JackSettings(settings) => m.ui_handle.send_cmd(UiCmd::JackSettings(settings)).await,
+        AddPort(port) => m.ui_handle.send_cmd(UiCmd::AddPort(port)).await,
+        DelPort(id) => m.ui_handle.send_cmd(UiCmd::DelPort(id)).await,
+        AddConnection(a, b) => m.ui_handle.send_cmd(UiCmd::AddConnection(a, b)).await,
+        DelConnection(a, b) => m.ui_handle.send_cmd(UiCmd::DelConnection(a, b)).await,
+    }
+}
+
+/// Events from the UI runtime
+async fn handle_ui_ev(_: &mut Model, ev: UiEvent) {
+    match ev {
+        _ => {}
+    }
+}
+
+/// Events from the hardware runtime
+async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {
+    match ev {
+        _ => {}
+    }
+}
