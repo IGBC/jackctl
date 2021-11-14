@@ -135,49 +135,26 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
             m.cards.remove(&id);
         }
         UpdateMixerVolume(volume) => {
-            let c = m.cards.get_mut(&volume.card);
-            if c.is_some() {
-                let c = c.unwrap();
-                let chan = c.channels.get_mut(&volume.channel);
-                if chan.is_some() {
-                    let chan = chan.unwrap();
-                    let oldv = chan.volume;
-                    if volume.volume != oldv {
-                        println!(
-                            "Volume Different {} - {}: {}",
-                            volume.volume, c.name, chan.name
-                        );
-                        chan.volume = volume.volume;
-                        m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await;
-                    } else {
-                        println!("Volume Same {} - {}: {}", volume.volume, c.name, chan.name);
-                    }
-                } else {
-                    println!(
-                        "vol for unknown channel {} on card {}",
-                        volume.channel, volume.card
-                    );
-                }
-            } else {
-                println!("vol for unknown card {}", volume.card);
+            let c = m.cards.get_mut(&volume.card).unwrap();
+            let chan = c.channels.get_mut(&volume.channel).unwrap();
+            let oldv = chan.volume;
+            if volume.volume != oldv {
+                println!(
+                    "Volume Different {} - {}: {}",
+                    volume.volume, c.name, chan.name
+                );
+                chan.volume = volume.volume;
+                m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await;
             }
         }
         UpdateMixerMute(mute) => {
-            let c = m.cards.get_mut(&mute.card);
-            if c.is_some() {
-                let c = c.unwrap();
-                let chan = c.channels.get_mut(&mute.channel);
-                if chan.is_some() {
-                    let chan = chan.unwrap();
-                    let oldm = chan.switch;
-                    if mute.mute != oldm {
-                        println!("Mute Different {} - {}: {}", mute.mute, c.name, chan.name);
-                        chan.switch = mute.mute;
-                        m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
-                    } else {
-                        println!("Mute Same {} - {}: {}", mute.mute, c.name, chan.name);
-                    }
-                }
+            let c = m.cards.get_mut(&mute.card).unwrap();
+            let chan = c.channels.get_mut(&mute.channel).unwrap();
+            let oldm = chan.switch;
+            if mute.mute != oldm {
+                println!("Mute Different {} - {}: {}", mute.mute, c.name, chan.name);
+                chan.switch = mute.mute;
+                m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
             }
         }
     }
