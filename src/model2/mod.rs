@@ -61,15 +61,15 @@ async fn run(mut m: Model) {
         futures::select! {
             ev = jack_event_poll  => match ev {
                 Some(ev) => handle_jack_ev(&mut m, ev).await,
-                None => {println!("Channel jack dropped!"); return},
+                None => return,
             },
             ev = ui_event_poll  => match ev {
                 Some(ev) => handle_ui_ev(&mut m, ev).await,
-                None => {println!("Channel ui dropped!"); return},
+                None => return,
             },
             ev = hw_event_poll  => match ev {
                 Some(ev) => handle_hw_ev(&mut m, ev).await,
-                None => {println!("Channel hw dropped!"); return},
+                None => return,
             },
         }
     }
@@ -77,6 +77,7 @@ async fn run(mut m: Model) {
 
 /// Events from the jack runtime
 async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
+    println!("Selected JACK EVENT");
     use JackEvent::*;
     match ev {
         XRun => m.ui_handle.send_cmd(UiCmd::IncrementXRun).await,
@@ -90,6 +91,7 @@ async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
 
 /// Events from the UI runtime
 async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
+    println!("Selected UI EVENT");
     use UiEvent::*;
     match ev {
         SetMuting(mute) => m.hw_handle.send_cmd(HardwareCmd::SetMixerMute(mute)).await,
@@ -105,6 +107,7 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
 
 /// Events from the hardware runtime
 async fn handle_hw_ev(_: &mut Model, ev: HardwareEvent) {
+    println!("Selected HW EVENT");
     use HardwareEvent::*;
     match ev {
         NewCardFound {
