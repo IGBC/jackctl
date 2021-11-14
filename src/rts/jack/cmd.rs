@@ -11,8 +11,11 @@ pub async fn do_event(jack: Arc<JackRuntime>) {
 
         let settings = interval_update(&jack);
 
-        jack.event_tx.send(JackEvent::JackSettings(settings)).await.unwrap();
-    
+        jack.event_tx
+            .send(JackEvent::JackSettings(settings))
+            .await
+            .unwrap();
+
         // this rate limits updates to the mixers, we don't need to update at 100 FPS
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
@@ -55,7 +58,7 @@ fn interval_update(jack: &Arc<JackRuntime>) -> JackSettings {
     let cpu_percentage = client.cpu_load();
     let sample_rate = client.sample_rate() as u64;
     let buffer_size = client.buffer_size() as u64;
-    let latency =  (buffer_size) as f32 / (sample_rate as f32 / 1000.0) * jack.n_periods as f32;
+    let latency = (buffer_size) as f32 / (sample_rate as f32 / 1000.0) * jack.n_periods as f32;
 
     JackSettings {
         cpu_percentage,

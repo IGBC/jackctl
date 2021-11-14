@@ -109,6 +109,7 @@ pub enum HardwareCmd {
 pub enum HardwareEvent {
     NewCardFound {
         id: CardId,
+        name: String,
         capture: Option<CardConfig>,
         playback: Option<CardConfig>,
         mixerchannels: Vec<MixerChannel>,

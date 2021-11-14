@@ -12,9 +12,9 @@ pub type ChannelCount = u32;
 pub struct Card {
     pub id: i32,
     pub client_handle: Option<u64>,
-    pub inputs: Option<CardConfig>, // option contains best sample rate
-    pub outputs: Option<CardConfig>, // option contains best sample rate
-    name: String,
+    pub capture: Option<CardConfig>, // option contains best sample rate
+    pub playback: Option<CardConfig>, // option contains best sample rate
+    pub name: String,
     pub channels: HashMap<u32, MixerChannel>,
     pub state: CardStatus,
 }

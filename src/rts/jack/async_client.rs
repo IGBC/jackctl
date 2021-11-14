@@ -20,7 +20,7 @@ impl JackNotificationController {
             e => {
                 println!("warning: Unknown port type: {}", e);
                 PortType::Unknown
-            },
+            }
         };
 
         let flags = p.flags();

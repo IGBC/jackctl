@@ -150,11 +150,12 @@ impl AlsaController {
                 if !cards.contains(&id) {
                     // if we have not seen this card before then we enumerate it
                     match Self::enumerate_card(id) {
-                        Ok(Some((capture, playback, mixerchannels))) => {
+                        Ok(Some((capture, playback, mixerchannels, name))) => {
                             match self
                                 .event_tx
                                 .send(HardwareEvent::NewCardFound {
                                     id,
+                                    name,
                                     capture,
                                     playback,
                                     mixerchannels,
@@ -189,50 +190,42 @@ impl AlsaController {
             for card in cards.iter() {
                 match Mixer::new(&format!("hw:{}", card), false) {
                     Ok(mixer) => {
-                        for elem in mixer.iter() {
+                        for (elem_id, elem) in mixer.iter().enumerate() {
                             let selem = Selem::new(elem).unwrap();
 
                             if selem.has_capture_volume() {
                                 if Self::has_switch(&selem) {
                                     let mute = Self::get_muting(false, &selem);
-                                    let channel = selem.get_id().get_index();
-                                    drop(selem);
                                     events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                                         card: *card,
-                                        channel,
+                                        channel: elem_id as u32,
                                         mute,
                                     }));
                                 }
 
                                 let selem = Selem::new(elem).unwrap();
                                 let volume = Self::get_volume(false, &selem);
-                                let channel = selem.get_id().get_index();
-                                drop(selem);
                                 events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                                     card: *card,
-                                    channel,
+                                    channel: elem_id as u32,
                                     volume,
                                 }));
                             } else {
                                 if selem.has_playback_volume() {
                                     if Self::has_switch(&selem) {
                                         let mute = Self::get_muting(true, &selem);
-                                        let channel = selem.get_id().get_index();
-                                        drop(selem);
                                         events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                                             card: *card,
-                                            channel,
+                                            channel: elem_id as u32,
                                             mute,
                                         }));
                                     }
 
                                     let selem = Selem::new(elem).unwrap();
                                     let volume = Self::get_volume(true, &selem);
-                                    let channel = selem.get_id().get_index();
-                                    drop(selem);
                                     events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                                         card: *card,
-                                        channel,
+                                        channel: elem_id as u32,
                                         volume,
                                     }));
                                 }
@@ -270,8 +263,15 @@ impl AlsaController {
 
     fn enumerate_card(
         id: CardId,
-    ) -> Result<Option<(Option<CardConfig>, Option<CardConfig>, Vec<MixerChannel>)>, alsa::Error>
-    {
+    ) -> Result<
+        Option<(
+            Option<CardConfig>,
+            Option<CardConfig>,
+            Vec<MixerChannel>,
+            String,
+        )>,
+        alsa::Error,
+    > {
         let inputs = match Self::attempt_capture_enumerate(id) {
             Ok((rates, channels)) => {
                 let rate = Self::pick_best_rate(&rates);
@@ -293,6 +293,9 @@ impl AlsaController {
             }
             _ => None,
         };
+
+        let card = Card::new(id);
+        let name = card.get_name()?;
 
         if inputs.is_some() || outputs.is_some() {
             // this is the old mixer enumeration code, but we're only running it once.
@@ -359,14 +362,9 @@ impl AlsaController {
                 };
             }
 
-            Ok(Some((inputs, outputs, channels)))
+            Ok(Some((inputs, outputs, channels, name)))
         } else {
-            let card = Card::new(id);
-            println!(
-                "Failed to enumerate card {} - {}",
-                id,
-                card.get_name().unwrap_or("<failed to get name>".to_owned())
-            );
+            println!("Failed to enumerate card {} - {} has no channels", id, name,);
             Ok(None)
         }
     }
