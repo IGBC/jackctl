@@ -1,15 +1,16 @@
 use crate::{
     model2::{
-        events::{UiCmd, UiEvent},
+        events::{JackSettings, UiCmd},
         port::{Port, PortType},
     },
-    ui::{matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
+    ui::{about::About, matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
 };
-use async_std::{channel::TryRecvError, task::block_on};
+use async_std::task::block_on;
 use gio::ApplicationExt;
+use glib::Continue;
 use gtk::{
     Application, Builder, Button, ButtonExt, CssProviderExt, GtkWindowExt, Label, LabelExt,
-    LevelBar, ModelButton, WidgetExt, Window,
+    LevelBar, LevelBarExt, ModelButton, WidgetExt, Window,
 };
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -49,7 +50,13 @@ impl MainWindow {
     /// This function sets up a bunch of Gtk state and must be called!
     fn setup_application(self: &Arc<Self>, app: &Application, builder: Builder) {
         let this = Arc::clone(self);
-        self.inner.connect_draw(move |_, _| this.poll_updates());
+        glib::timeout_add_local(200, move || {
+            this.poll_updates();
+            Continue(true)
+        });
+
+        // Setup about screen
+        About::new(&builder).button(&builder);
 
         let this = Arc::clone(self);
         app.connect_startup(move |app| {
@@ -68,19 +75,22 @@ impl MainWindow {
             );
 
             this.inner.set_application(Some(app));
-            this.setup_ui(app, &builder);
+            block_on(async { this.setup_ui(app, &builder).await });
         });
 
-        self.inner.show();
+        self.inner.show_all();
     }
 
     /// This function is called when Gtk application starts up
     ///
     /// Don't call it from outside this type!
-    fn setup_ui(&self, app: &Application, builder: &Builder) {
+    async fn setup_ui(&self, app: &Application, builder: &Builder) {
         let quit: ModelButton = utils::get_object(&builder, "quit.mainmenu");
         let app = app.clone();
         quit.connect_clicked(move |_| app.quit());
+
+        // ==^-^== Initially draw all UI elements ==^-^==
+        self.audio_matrix.draw().await;
     }
 
     /// This function is called every frame by Gtk to poll for updates
@@ -118,6 +128,7 @@ impl MainWindow {
                 is_hw,
             }) => match tt {
                 PortType::Audio => {
+                    panic!("WE HIT THIS CODE POINT HURRAY!!!!");
                     self.audio_matrix
                         .add_port(id, dir, is_hw, client_name, port_name)
                         .await
@@ -128,6 +139,17 @@ impl MainWindow {
                 }
             },
             UiCmd::IncrementXRun => self.labels.increment_xruns(),
+            UiCmd::JackSettings(JackSettings {
+                cpu_percentage,
+                sample_rate,
+                buffer_size,
+                latency,
+            }) => {
+                self.labels.update_frames(buffer_size);
+                self.labels.update_latency(latency);
+                self.labels.update_rate(sample_rate);
+                self.labels.update_cpu(cpu_percentage);
+            }
             _ => {}
         }
     }
@@ -169,6 +191,7 @@ impl Labels {
         });
 
         // Setup XRuns logic
+        this.setup_tooltips();
         this.reset_xruns();
         let this_ = Arc::clone(&this);
         this.xruns_btn.connect_clicked(move |icon| {
@@ -179,16 +202,36 @@ impl Labels {
         this
     }
 
+    fn setup_tooltips(self: &Arc<Self>) {
+        self.cpu_label
+            .set_tooltip_markup(Some("Jack CPU utilisation"));
+        self.cpu_mtr
+            .set_tooltip_markup(Some("Jack CPU utilisation"));
+        self.perf_rate
+            .set_tooltip_markup(Some("Jack sample rate (Hertz)"));
+        self.perf_frames
+            .set_tooltip_markup(Some("Sample buffer size (words)"));
+        self.perf_latency
+            .set_tooltip_markup(Some("Jack pipeline latency (milliseconds)"));
+    }
+
     /// Reset the xruns counter and update the label
     fn reset_xruns(self: &Arc<Self>) {
         self.xruns_ctr.store(0, Ordering::Relaxed);
-        self.xruns_label.set_markup(&format!("N.D. XRuns"));
+        self.xruns_label.set_markup(&format!("0 XRuns"));
+        self.xruns_btn.hide();
     }
 
     /// Increment xruns counter and update the label
     fn increment_xruns(self: &Arc<Self>) {
         let val = self.xruns_ctr.fetch_add(1, Ordering::Relaxed);
         self.xruns_label.set_markup(&format!("{} XRuns", val + 1));
+        self.xruns_btn.show();
+    }
+
+    fn update_cpu(self: &Arc<Self>, cpu: f32) {
+        self.cpu_label.set_markup(&format!("{}%", cpu.trunc()));
+        self.cpu_mtr.set_value(cpu as f64);
     }
 
     fn update_rate(self: &Arc<Self>, rate: u64) {
@@ -200,7 +243,8 @@ impl Labels {
     }
 
     fn update_latency(self: &Arc<Self>, latency: f32) {
-        self.perf_latency.set_markup(&format!("{}ms", latency));
+        self.perf_latency
+            .set_markup(&format!("{}ms", latency.trunc()));
     }
 }
 

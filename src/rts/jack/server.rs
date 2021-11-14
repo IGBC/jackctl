@@ -103,6 +103,7 @@ impl JackServer {
 
 impl Drop for JackServer {
     fn drop(&mut self) {
+        println!("Dropping jack server");
         self.end();
     }
 }

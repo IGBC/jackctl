@@ -77,7 +77,6 @@ async fn run(mut m: Model) {
 
 /// Events from the jack runtime
 async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
-    println!("Selected JACK EVENT");
     use JackEvent::*;
     match ev {
         XRun => m.ui_handle.send_cmd(UiCmd::IncrementXRun).await,
@@ -91,7 +90,6 @@ async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
 
 /// Events from the UI runtime
 async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
-    println!("Selected UI EVENT");
     use UiEvent::*;
     match ev {
         SetMuting(mute) => m.hw_handle.send_cmd(HardwareCmd::SetMixerMute(mute)).await,
@@ -105,7 +103,6 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
 
 /// Events from the hardware runtime
 async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
-    println!("Selected HW EVENT");
     use HardwareEvent::*;
     match ev {
         NewCardFound {
@@ -115,11 +112,7 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
             mixerchannels,
         } => {}
         DropCard { id } => {}
-        UpdateMixerVolume (volume) => {
-            m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await
-        }
-        UpdateMixerMute(mute) => {
-            m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await
-        }
+        UpdateMixerVolume(volume) => m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await,
+        UpdateMixerMute(mute) => m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await,
     }
 }

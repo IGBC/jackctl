@@ -1,5 +1,6 @@
 //! Jackctl GTK UI module
 
+mod about;
 mod matrix;
 mod pages;
 mod utils;
@@ -23,7 +24,6 @@ pub struct UiHandle {
 
 impl UiHandle {
     pub async fn next_event(&self) -> Option<UiEvent> {
-        println!("Polling for ui event");
         self.rx_event.recv().await.ok()
     }
     pub async fn send_cmd(&self, cmd: UiCmd) {
@@ -59,6 +59,7 @@ impl UiRuntime {
     /// Try to read events from the channel, up to a maximum number
     ///
     /// Returns `None` if the channel was empty or closed
+    #[inline]
     fn get_cmds(&self, max: u8) -> Option<Vec<UiCmd>> {
         let mut buf = vec![];
         for _ in 0..max {

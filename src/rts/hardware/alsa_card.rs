@@ -49,7 +49,6 @@ pub struct AlsaHandle {
 
 impl AlsaHandle {
     pub async fn next_event(&self) -> Option<HardwareEvent> {
-        println!("Polling for alsa event");
         self.event_rx.recv().await.ok()
     }
 
