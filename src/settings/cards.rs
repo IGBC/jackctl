@@ -1,4 +1,4 @@
-use crate::settings::Id;
+use crate::{model2::card::CardUsage, settings::Id};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -8,13 +8,30 @@ use std::collections::BTreeMap;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CardSettings {
     /// Store all known card settings
-    pub known: BTreeMap<Id, SoundCard>,
+    known: BTreeMap<String, SoundCard>,
     /// Identify a "default" sound card
-    pub default: Id,
+    default: Id,
+}
+
+impl CardSettings {
+    pub fn set_card_usage(&mut self, name: &String, _use: bool) {
+        if let Some(ref mut card) = self.known.get_mut(name) {
+            card._use = _use;
+        }
+    }
+
+    pub fn use_card(&self, name: &String) -> CardUsage {
+        match self.known.get(name) {
+            Some(card) if card._use => CardUsage::Yes,
+            Some(_) => CardUsage::No,
+            None => CardUsage::AskUser,
+        }
+    }
 }
 
 /// Encoding information about a single sound card
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SoundCard {
+struct SoundCard {
     pub name: String,
+    pub _use: bool,
 }

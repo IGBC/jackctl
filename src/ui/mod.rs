@@ -1,6 +1,7 @@
 //! Jackctl GTK UI module
 
 mod about;
+mod card_query;
 mod matrix;
 mod pages;
 mod utils;

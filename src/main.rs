@@ -16,6 +16,8 @@ fn main() {
     let dir = settings::scaffold();
     let set = settings::Settings::init(dir.config_dir()).unwrap();
 
+    println!("Test log");
+    
     let jack_if = rts::jack::JackRuntime::start(set.clone()).unwrap();
     let card_if = rts::hardware::HardwareHandle::new();
     let (_win, app, ui_if) = ui::create_ui();

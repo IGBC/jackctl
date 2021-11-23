@@ -4,8 +4,8 @@ pub mod card;
 pub mod events;
 pub mod port;
 
-use self::card::{Card, CardId, CardStatus};
-use self::events::{HardwareCmd, HardwareEvent, JackEvent, UiCmd, UiEvent};
+use self::card::{Card, CardId, CardStatus, CardUsage};
+use self::events::{HardwareCmd, HardwareEvent, JackCardAction, JackEvent, UiCmd, UiEvent};
 use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
 use crate::{settings::Settings, ui::UiHandle};
 use async_std::task;
@@ -99,6 +99,11 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
                 .send_cmd(HardwareCmd::SetMixerVolume(volume))
                 .await
         }
+        CardUsage(card, yes) if yes => {
+            m.settings.w().cards().set_card_usage(&card.name, true);
+            signal_jack_card(card, m).await;
+        }
+        CardUsage(Card { ref name, .. }, _) => m.settings.w().cards().set_card_usage(name, false),
     }
 }
 
@@ -121,7 +126,7 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
 
             let card = Card {
                 id,
-                name,
+                name: name.clone(),
                 capture,
                 playback,
                 channels,
@@ -129,7 +134,18 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
                 state: CardStatus::New,
             };
 
-            m.cards.insert(id, card);
+            m.cards.insert(id, card.clone());
+            let usage = m.settings.r().cards().use_card(&name);
+
+            match usage {
+                CardUsage::Yes => signal_jack_card(card, m).await,
+                CardUsage::No => {
+                    println!("Settings file told us not to use this card >:c");
+                }
+                CardUsage::AskUser => {
+                    m.ui_handle.send_cmd(UiCmd::AskCard(card)).await;
+                }
+            }
         }
         DropCard { id } => {
             m.cards.remove(&id);
@@ -156,6 +172,32 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
                 chan.switch = mute.mute;
                 m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
             }
+        }
+    }
+}
+
+async fn signal_jack_card(card: Card, m: &mut Model) {
+    let capture = card.capture();
+    let playback = card.playback();
+
+    if let (Some((r_in, n_in)), Some((r_out, n_out))) = (capture, playback) {
+        if r_in != r_out {
+            println!("[WARNING] IN rate is not equal to OUT rate");
+        }
+
+        // Inform Jack here
+        if let Err(_) = m
+            .jack_handle
+            .send_card_action(JackCardAction::StartCard {
+                id: card.id.to_string(),
+                name: card.name,
+                rate: r_in, // FIXME: AAAAAAAAAAAAAAAAAAAAAAAH!
+                in_ports: n_in,
+                out_ports: n_out,
+            })
+            .await
+        {
+            println!("Failed to send JackCardAction!");
         }
     }
 }

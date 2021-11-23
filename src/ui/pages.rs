@@ -1,5 +1,4 @@
 use crate::ui::utils;
-use async_std::sync::RwLock;
 use glib::object::IsA;
 use gtk::{prelude::*, Builder, Label, Notebook, PolicyType, Widget};
 use std::collections::BTreeMap;
@@ -25,6 +24,9 @@ impl Pages {
     }
 
     fn insert<T: IsA<Widget>>(&self, label: &str, child: &T) {
+        let curr = self.get_current();
+        self.remove_page(label);
+
         let pos = self
             .order
             .get(label)
@@ -35,6 +37,9 @@ impl Pages {
             Some(&Label::new(Some(label))),
             Some(*pos),
         );
+
+        self.show_all();
+        self.set_current(curr);
     }
 
     #[inline]
@@ -50,7 +55,7 @@ impl Pages {
     }
 
     /// Remove a page by label
-    pub fn remove_page(&self, label: &str) {
+    fn remove_page(&self, label: &str) {
         let pos = self
             .order
             .get(label)

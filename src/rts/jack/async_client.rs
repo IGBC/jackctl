@@ -23,7 +23,8 @@ impl JackNotificationController {
             }
         };
 
-        let flags = p.flags();
+        println!("=== {:?} ===", p.name());
+        let flags = dbg!(p.flags());
         let port_dir = if flags.contains(PortFlags::IS_OUTPUT) {
             PortDirection::Output
         } else {

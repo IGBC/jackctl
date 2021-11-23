@@ -1,5 +1,5 @@
 use crate::{
-    model2::card::{CardConfig, CardId, ChannelId, MixerChannel, Volume},
+    model2::card::{Card, CardConfig, CardId, ChannelId, MixerChannel, Volume},
     model2::port::{JackPortType, Port},
 };
 use jack::InternalClientID;
@@ -38,6 +38,23 @@ pub struct JackSettings {
     pub latency: f32,
 }
 
+/// Jack event types executed on the model
+#[derive(Clone, Debug)]
+pub enum JackEvent {
+    /// Called when the JACK Server overruns
+    XRun,
+    /// Called when jack has new server settings.
+    JackSettings(JackSettings),
+    /// Add a port duh
+    AddPort(Port),
+    /// Delete a port
+    DelPort(JackPortType),
+    /// Add a connection between ports
+    AddConnection(JackPortType, JackPortType),
+    /// Delete a connection between ports
+    DelConnection(JackPortType, JackPortType),
+}
+
 #[derive(Clone, Debug)]
 pub struct MuteCmd {
     pub card: CardId,
@@ -59,6 +76,8 @@ pub enum UiEvent {
     SetMuting(MuteCmd),
     /// Called when the user requests a volume change on a channel
     SetVolume(VolumeCmd),
+    /// The user told us about their sound card
+    CardUsage(Card, bool),
 }
 
 /// Commands from the model to manipulate the UI state
@@ -80,23 +99,8 @@ pub enum UiCmd {
     AddConnection(JackPortType, JackPortType),
     /// Delete a connection between ports
     DelConnection(JackPortType, JackPortType),
-}
-
-/// Jack event types executed on the model
-#[derive(Clone, Debug)]
-pub enum JackEvent {
-    /// Called when the JACK Server overruns
-    XRun,
-    /// Called when jack has new server settings.
-    JackSettings(JackSettings),
-    /// Add a port duh
-    AddPort(Port),
-    /// Delete a port
-    DelPort(JackPortType),
-    /// Add a connection between ports
-    AddConnection(JackPortType, JackPortType),
-    /// Delete a connection between ports
-    DelConnection(JackPortType, JackPortType),
+    /// Ask the user about their sound card
+    AskCard(Card),
 }
 
 #[derive(Clone, Debug)]

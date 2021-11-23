@@ -1,6 +1,6 @@
 use crate::{
     model2::port::{JackPortType, PortDirection},
-    ui::utils,
+    ui::{pages::Pages, utils},
 };
 use async_std::sync::RwLock;
 use gtk::{prelude::*, Align, Orientation, Separator};
@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct PortStateElement {
     is_hw: bool,
     port: String,
@@ -67,14 +67,17 @@ impl AudioMatrix {
     }
 
     async fn is_empty(&self) -> bool {
-        self._in.read().await.is_empty() || self.out.read().await.is_empty()
+        dbg!(self._in.read().await.is_empty()) || dbg!(self.out.read().await.is_empty())
     }
 
     /// Redraw this widget if it's dirty
-    pub async fn draw(&self) {
+    pub async fn draw(&self, pages: &Pages) {
         if !self.dirty.load(Ordering::Relaxed) {
             return;
         }
+
+        // println!("Inputs: {:#?}", self._in.read().await);
+        // println!("Outputs: {:#?}", self.out.read().await);
 
         let grid = utils::grid();
         if self.is_empty().await {
@@ -128,7 +131,10 @@ impl AudioMatrix {
             });
         }
 
+        self.dirty.fetch_and(false, Ordering::Relaxed);
+
         // Do magic things with grid
+        pages.insert_scrolled("Matrix", dbg!(&grid));
     }
 
     // This function updates the matrix based on the current model

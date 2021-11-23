@@ -1,6 +1,6 @@
 use crate::{
     model2::{
-        events::{JackSettings, UiCmd},
+        events::{JackSettings, UiCmd, UiEvent},
         port::{Port, PortType},
     },
     ui::{about::About, matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
@@ -90,7 +90,8 @@ impl MainWindow {
         quit.connect_clicked(move |_| app.quit());
 
         // ==^-^== Initially draw all UI elements ==^-^==
-        self.audio_matrix.draw().await;
+        self.audio_matrix.draw(&self.pages).await;
+        self.pages.show_all();
     }
 
     /// This function is called every frame by Gtk to poll for updates
@@ -110,14 +111,14 @@ impl MainWindow {
             }
 
             // ==^-^== Then redraw all dirty elements ==^-^==
-            self.audio_matrix.draw().await;
+            self.audio_matrix.draw(&self.pages).await;
+            self.pages.show_all();
         });
 
         gtk::Inhibit(false)
     }
 
     async fn update(self: &Arc<Self>, cmd: UiCmd) {
-        // TODO: handle more than one event at a time
         match cmd {
             UiCmd::AddPort(Port {
                 client_name,
@@ -128,7 +129,6 @@ impl MainWindow {
                 is_hw,
             }) => match tt {
                 PortType::Audio => {
-                    panic!("WE HIT THIS CODE POINT HURRAY!!!!");
                     self.audio_matrix
                         .add_port(id, dir, is_hw, client_name, port_name)
                         .await
@@ -149,6 +149,10 @@ impl MainWindow {
                 self.labels.update_latency(latency);
                 self.labels.update_rate(sample_rate);
                 self.labels.update_cpu(cpu_percentage);
+            }
+            UiCmd::AskCard(card) => {
+                println!("Ask the user whether we should use {:?}", card);
+                self.rt.sender().send(UiEvent::CardUsage(card, true));
             }
             _ => {}
         }

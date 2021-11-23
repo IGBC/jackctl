@@ -3,8 +3,7 @@ use crate::model2::card::{CardConfig, CardId, ChannelCount, MixerChannel, Sample
 use crate::model2::events::{HardwareCardAction, HardwareCmd, HardwareEvent, MuteCmd, VolumeCmd};
 use alsa::card::Card;
 use alsa::card::Iter as CardIter;
-use alsa::mixer::SelemId;
-use alsa::mixer::{Mixer, Selem, SelemChannelId};
+use alsa::mixer::{Elem, Mixer, Selem, SelemChannelId, SelemId};
 use alsa::pcm::{HwParams, PCM};
 use alsa::Direction;
 use async_std::{
@@ -104,12 +103,12 @@ impl AlsaController {
         }
         {
             let rt = Arc::clone(self);
-            task::spawn(async move { rt.do_event().await });
+            task::spawn(async move { rt.handle_events().await });
         }
-        {
-            let rt = Arc::clone(&self);
-            task::spawn(async move { rt.respond_card().await });
-        }
+        // {
+        //     let rt = Arc::clone(&self);
+        //     task::spawn(async move { rt.respond_card().await });
+        // }
     }
 
     async fn do_cmd(self: Arc<Self>) {
@@ -136,54 +135,17 @@ impl AlsaController {
         }
     }
 
-    async fn do_event(self: Arc<Self>) {
+    async fn handle_events(self: Arc<Self>) {
         loop {
             if self.cmd_rx.is_closed() {
                 break;
             }
 
-            //todo poll alsa for shit
-            for card in CardIter::new().map(|x| x.unwrap()) {
-                let id = card.get_index();
+            // Enumerate known cards and update known_cards cache
+            self.update_card_cache().await;
 
-                let mut cards = self.known_cards.write().await;
-
-                if !cards.contains_key(&id) {
-                    // if we have not seen this card before then we enumerate it
-                    match Self::enumerate_card(id) {
-                        Ok(Some((capture, playback, mixerchannels, name))) => {
-                            match self
-                                .event_tx
-                                .send(HardwareEvent::NewCardFound {
-                                    id,
-                                    name,
-                                    capture,
-                                    playback,
-                                    mixerchannels,
-                                })
-                                .await
-                            {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    panic!("FATAL ERROR: ALSA Event tx - {}", e);
-                                }
-                            }
-                            cards.insert(id, true);
-                        }
-                        Ok(None) => {
-                            eprintln!("Error: Card {} had no playback or capture channels", id);
-                            cards.insert(id, false);
-                        }
-                        Err(e) => {
-                            cards.insert(id, false);
-                            eprintln!("Error: {}", e);
-                        }
-                    }
-                }
-            }
-
-            let mut events: Vec<HardwareEvent> = Vec::new();
-
+            // ???
+            let mut events = vec![];
             let cards = self.known_cards.read().await;
 
             for (card, is_ok) in cards.iter() {
@@ -193,44 +155,7 @@ impl AlsaController {
                         Ok(mixer) => {
                             for (elem_id, elem) in mixer.iter().enumerate() {
                                 let selem = Selem::new(elem).unwrap();
-
-                                if selem.has_capture_volume() {
-                                    if Self::has_switch(&selem) {
-                                        let mute = Self::get_muting(false, &selem);
-                                        events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
-                                            card: *card,
-                                            channel: elem_id as u32,
-                                            mute,
-                                        }));
-                                    }
-
-                                    let selem = Selem::new(elem).unwrap();
-                                    let volume = Self::get_volume(false, &selem);
-                                    events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
-                                        card: *card,
-                                        channel: elem_id as u32,
-                                        volume,
-                                    }));
-                                } else {
-                                    if selem.has_playback_volume() {
-                                        if Self::has_switch(&selem) {
-                                            let mute = Self::get_muting(true, &selem);
-                                            events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
-                                                card: *card,
-                                                channel: elem_id as u32,
-                                                mute,
-                                            }));
-                                        }
-
-                                        let selem = Selem::new(elem).unwrap();
-                                        let volume = Self::get_volume(true, &selem);
-                                        events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
-                                            card: *card,
-                                            channel: elem_id as u32,
-                                            volume,
-                                        }));
-                                    }
-                                }
+                                self.set_capture_volume(card, elem_id, elem, selem, &mut events);
                             }
                         }
                         Err(e) => {
@@ -252,6 +177,96 @@ impl AlsaController {
         }
     }
 
+    fn set_capture_volume(
+        self: &Arc<Self>,
+        card: &i32,
+        elem_id: usize,
+        elem: Elem<'_>,
+        selem: Selem<'_>,
+        events: &mut Vec<HardwareEvent>,
+    ) {
+        if selem.has_capture_volume() {
+            if Self::has_switch(&selem) {
+                let mute = Self::get_muting(false, &selem);
+                events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
+                    card: *card,
+                    channel: elem_id as u32,
+                    mute,
+                }));
+            }
+
+            let selem = Selem::new(elem).unwrap();
+            let volume = Self::get_volume(false, &selem);
+            events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
+                card: *card,
+                channel: elem_id as u32,
+                volume,
+            }));
+        } else {
+            if selem.has_playback_volume() {
+                if Self::has_switch(&selem) {
+                    let mute = Self::get_muting(true, &selem);
+                    events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
+                        card: *card,
+                        channel: elem_id as u32,
+                        mute,
+                    }));
+                }
+
+                let selem = Selem::new(elem).unwrap();
+                let volume = Self::get_volume(true, &selem);
+                events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
+                    card: *card,
+                    channel: elem_id as u32,
+                    volume,
+                }));
+            }
+        }
+    }
+
+    async fn update_card_cache(self: &Arc<Self>) {
+        // todo poll alsa for shit
+        for card in CardIter::new().map(|x| x.unwrap()) {
+            let id = card.get_index();
+
+            let mut cards = self.known_cards.write().await;
+
+            if !cards.contains_key(&id) {
+                // if we have not seen this card before then we enumerate it
+                match Self::enumerate_card(id) {
+                    Ok(Some((capture, playback, mixerchannels, name))) => {
+                        match self
+                            .event_tx
+                            .send(HardwareEvent::NewCardFound {
+                                id,
+                                name,
+                                capture,
+                                playback,
+                                mixerchannels,
+                            })
+                            .await
+                        {
+                            Ok(_) => (),
+                            Err(e) => {
+                                panic!("FATAL ERROR: ALSA Event tx - {}", e);
+                            }
+                        }
+                        cards.insert(id, true);
+                    }
+                    Ok(None) => {
+                        eprintln!("Error: Card {} had no playback or capture channels", id);
+                        cards.insert(id, false);
+                    }
+                    Err(e) => {
+                        cards.insert(id, false);
+                        eprintln!("Error: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    /// The goggles do nothing...
     async fn respond_card(self: Arc<Self>) {
         while let Ok(event) = self.card_rx.recv().await {
             match event {
