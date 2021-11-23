@@ -148,7 +148,8 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
             }
         }
         DropCard { id } => {
-            m.cards.remove(&id);
+            let card = m.cards.remove(&id).unwrap();
+            let _ = m.jack_handle.send_card_action(JackCardAction::StopCard{ id: card.client_handle.unwrap() }).await;
         }
         UpdateMixerVolume(volume) => {
             let c = m.cards.get_mut(&volume.card).unwrap();
@@ -186,7 +187,7 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
         }
 
         // Inform Jack here
-        if let Err(_) = m
+        let client_handle = m
             .jack_handle
             .send_card_action(JackCardAction::StartCard {
                 id: card.id.to_string(),
@@ -195,9 +196,10 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
                 in_ports: n_in,
                 out_ports: n_out,
             })
-            .await
-        {
-            println!("Failed to send JackCardAction!");
+            .await;
+        if client_handle.is_err() {
+            eprintln!("[ERROR] Card {} Could not be started by jack", card.id)
         }
+        m.cards.get_mut(&card.id).unwrap().client_handle = client_handle.ok();
     }
 }

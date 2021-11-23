@@ -146,7 +146,8 @@ impl AlsaController {
 
             // ???
             let mut events = vec![];
-            let cards = self.known_cards.read().await;
+            let mut dropped_cards = vec![];
+            let mut cards = self.known_cards.write().await;
 
             for (card, is_ok) in cards.iter() {
                 // if this card was enumerated correctly
@@ -161,10 +162,16 @@ impl AlsaController {
                         Err(e) => {
                             // OK card is gone, we expected this eventually;
                             eprintln!("card{}: {}", card, e);
-                            events.push(HardwareEvent::DropCard { id: *card });
+                            dropped_cards.push(*card);
                         }
                     }
                 }
+            }
+
+            for card in dropped_cards {
+                cards.insert(card, false);
+                eprintln!("card{}: sending drop card event", card);
+                events.push(HardwareEvent::DropCard { id: card });
             }
 
             for e in events.into_iter() {

@@ -31,6 +31,7 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 r.reply(result).await.unwrap();
             }
             (JackCardAction::StopCard { id }, r) => {
+                println!("Stopping card {}", id);
                 stop_card(&jack.a_client.as_client(), id);
                 r.reply(Ok(0)).await.unwrap();
             }
