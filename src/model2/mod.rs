@@ -149,7 +149,10 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
         }
         DropCard { id } => {
             let card = m.cards.remove(&id).unwrap();
-            let _ = m.jack_handle.send_card_action(JackCardAction::StopCard{ id: card.client_handle.unwrap() }).await;
+            match card.client_handle {
+                Some(id) => { let _ = m.jack_handle.send_card_action(JackCardAction::StopCard{ id }).await; },
+                None => { eprintln!("[Error]: Attempt to drop card that was never started, was there an error starting it?") }
+            }
         }
         UpdateMixerVolume(volume) => {
             let c = m.cards.get_mut(&volume.card).unwrap();
@@ -197,9 +200,9 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
                 out_ports: n_out,
             })
             .await;
-        if client_handle.is_err() {
-            eprintln!("[ERROR] Card {} Could not be started by jack", card.id)
+        match client_handle {
+            Ok(h) => { m.cards.get_mut(&card.id).unwrap().client_handle = Some(h); },
+            Err(e) => { eprintln!("[ERROR] Card {} Could not be started by jack: {}", card.id, e) }
         }
-        m.cards.get_mut(&card.id).unwrap().client_handle = client_handle.ok();
     }
 }

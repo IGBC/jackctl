@@ -169,7 +169,7 @@ impl AlsaController {
             }
 
             for card in dropped_cards {
-                cards.insert(card, false);
+                cards.remove(&card);
                 eprintln!("card{}: sending drop card event", card);
                 events.push(HardwareEvent::DropCard { id: card });
             }
