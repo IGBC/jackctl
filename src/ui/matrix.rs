@@ -1,5 +1,6 @@
 use crate::{
     model2::port::{JackPortType, PortDirection},
+    settings::{Settings, IoOrder},
     ui::{pages::Pages, utils},
 };
 use async_std::sync::RwLock;
@@ -7,6 +8,7 @@ use gtk::{prelude::*, Align, Orientation, Separator};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::atomic::{AtomicBool, Ordering},
+    sync::Arc,
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -71,38 +73,35 @@ impl AudioMatrix {
     }
 
     /// Redraw this widget if it's dirty
-    pub async fn draw(&self, pages: &Pages) {
+    pub async fn draw(&self, settings: &Arc<Settings>, pages: &Pages) {
         if !self.dirty.load(Ordering::Relaxed) {
             return;
         }
-
-        // println!("Inputs: {:#?}", self._in.read().await);
-        // println!("Outputs: {:#?}", self.out.read().await);
-
+        
         let grid = utils::grid();
         if self.is_empty().await {
             let l = utils::grid_label("No ports are currently available", false);
             l.set_halign(Align::Center);
             grid.attach(&l, 0, 0, 1, 1);
         } else {
-            let _in = self._in.read().await;
-            let (num_in_clients, num_in_ports) = count_map(&_in);
-            println!("Number in: {}", num_in_clients);
-            println!("{:#?}", _in);
-
-            let out = self.out.read().await;
-            let (num_out_clients, num_out_ports) = count_map(&out);
-            println!("Number out: {}", num_out_clients);
-            println!("{:#?}", out);
+            // Depending on the app settings assign vertical and
+            // horizontal state to inputs and outputs
+            let (vert, horz) = match settings.r().app().io_order {
+                IoOrder::VerticalInputs => (self._in.read().await, self.out.read().await),
+                IoOrder::HorizontalInputs => (self.out.read().await, self._in.read().await),
+            };
+            
+            let (num_vert_clients, num_vert_ports) = count_map(&vert);
+            let (num_horz_clients, num_horz_ports) = count_map(&horz);
 
             // Number of clients (aka separators) + number of ports +
             // 2 labels (-1 because 0-indexed)
-            let max_x: i32 = 2 + num_in_clients as i32 + num_in_ports as i32 - 1;
-            let max_y: i32 = 2 + num_out_clients as i32 + num_out_ports as i32 - 1;
+            let max_x: i32 = 2 + num_vert_clients as i32 + num_vert_ports as i32 - 1;
+            let max_y: i32 = 2 + num_horz_clients as i32 + num_horz_ports as i32 - 1;
 
             // Draw input labels
             let mut curr_x = 2;
-            _in.iter().enumerate().for_each(|(i, (client, set))| {
+            vert.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, true);
                 grid.attach(&l, curr_x, 0, set.len() as i32, 1);
 
@@ -111,15 +110,15 @@ impl AudioMatrix {
                     grid.attach(&l, curr_x2 as i32 + curr_x, 1, 1, 1);
                 });
 
-                if i < num_in_clients - 1 {
+                if i < num_vert_clients - 1 {
                     grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
                 }
                 curr_x += set.len() as i32 + 1;
             });
 
-            // Draw output labels
+            // Draw horizontal labels
             let mut curr_y = 2;
-            out.iter().enumerate().for_each(|(i, (client, set))| {
+            horz.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, false);
                 grid.attach(&l, 0, curr_y, 1, set.len() as i32);
 
@@ -128,7 +127,7 @@ impl AudioMatrix {
                     grid.attach(&l, 1, curr_y2 as i32 + curr_y, 1, 1);
                 });
 
-                if i < num_in_clients - 1 {
+                if i < num_vert_clients - 1 {
                     grid.attach(&Separator::new(Orientation::Vertical), 0, curr_x, max_x, 1);
                 }
                 curr_y += set.len() as i32 + 1;
@@ -146,9 +145,9 @@ impl AudioMatrix {
     //     &mut self,
     //     pages: &mut Pages,
     //     inputs: &PortGroup,
-    //     outputs: &PortGroup,
+    //     horzputs: &PortGroup,
     // ) {
-    //     let (grid, callbacks) = utils::generate_grid(jack, inputs, outputs);
+    //     let (grid, callbacks) = utils::generate_grid(jack, inputs, horzputs);
     //     pages.remove_page("Matrix");
     //     pages.insert_scrolled("Matrix", &grid);
     //     self.inner = callbacks;

@@ -3,6 +3,7 @@ use crate::{
         events::{JackSettings, UiCmd, UiEvent},
         port::{Port, PortType},
     },
+    settings::Settings,
     ui::{about::About, matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
 };
 use async_std::task::block_on;
@@ -20,13 +21,14 @@ use std::sync::{
 pub struct MainWindow {
     inner: Window,
     rt: UiRuntime,
+    settings: Arc<Settings>,
     labels: Arc<Labels>,
     pages: Pages,
     audio_matrix: AudioMatrix,
 }
 
 impl MainWindow {
-    fn new(builder: &Builder, rt: UiRuntime) -> Arc<Self> {
+    fn new(settings: Arc<Settings>, builder: &Builder, rt: UiRuntime) -> Arc<Self> {
         let inner = utils::get_object(builder, "maindialog");
         let labels = Labels::new(builder, &rt);
         let pages = Pages::new(builder, vec!["Matrix", "MIDI", "Mixer", "Setup"]);
@@ -36,6 +38,7 @@ impl MainWindow {
             inner,
             labels,
             pages,
+            settings,
             audio_matrix: AudioMatrix::new(),
         };
 
@@ -90,7 +93,7 @@ impl MainWindow {
         quit.connect_clicked(move |_| app.quit());
 
         // ==^-^== Initially draw all UI elements ==^-^==
-        self.audio_matrix.draw(&self.pages).await;
+        self.audio_matrix.draw(&self.settings, &self.pages).await;
         self.pages.show_all();
     }
 
@@ -111,7 +114,7 @@ impl MainWindow {
             }
 
             // ==^-^== Then redraw all dirty elements ==^-^==
-            self.audio_matrix.draw(&self.pages).await;
+            self.audio_matrix.draw(&self.settings, &self.pages).await;
             self.pages.show_all();
         });
 
@@ -252,10 +255,14 @@ impl Labels {
     }
 }
 
-pub(super) fn create(builder: Builder, rt: UiRuntime) -> (Arc<MainWindow>, Application) {
+pub(super) fn create(
+    settings: Arc<Settings>,
+    builder: Builder,
+    rt: UiRuntime,
+) -> (Arc<MainWindow>, Application) {
     let app = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Failed to initialise Gtk application!");
-    let win = MainWindow::new(&builder, rt);
+    let win = MainWindow::new(settings, &builder, rt);
     win.setup_application(&app, builder);
     (win, app)
 }

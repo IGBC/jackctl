@@ -37,6 +37,8 @@
 //! [`sync()`](Settings::sync)!
 
 mod app;
+pub use app::{IoOrder, UiLaunchMode};
+
 mod cards;
 mod clients;
 mod jack;
