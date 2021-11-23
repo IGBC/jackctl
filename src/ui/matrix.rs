@@ -87,9 +87,13 @@ impl AudioMatrix {
         } else {
             let _in = self._in.read().await;
             let (num_in_clients, num_in_ports) = count_map(&_in);
+            println!("Number in: {}", num_in_clients);
+            println!("{:#?}", _in);
 
             let out = self.out.read().await;
             let (num_out_clients, num_out_ports) = count_map(&out);
+            println!("Number out: {}", num_out_clients);
+            println!("{:#?}", out);
 
             // Number of clients (aka separators) + number of ports +
             // 2 labels (-1 because 0-indexed)
@@ -97,7 +101,7 @@ impl AudioMatrix {
             let max_y: i32 = 2 + num_out_clients as i32 + num_out_ports as i32 - 1;
 
             // Draw input labels
-            let mut curr_x = 1;
+            let mut curr_x = 2;
             _in.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, true);
                 grid.attach(&l, curr_x, 0, set.len() as i32, 1);
@@ -114,7 +118,7 @@ impl AudioMatrix {
             });
 
             // Draw output labels
-            let mut curr_y = 1;
+            let mut curr_y = 2;
             out.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, false);
                 grid.attach(&l, 0, curr_y, 1, set.len() as i32);
