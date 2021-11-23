@@ -50,7 +50,7 @@ fn launch_card(
 ) -> Result<InternalClientID, jack::Error> {
     let psize = client.buffer_size();
     let args = format!(
-        "-d {} -r {} -p {} -n {} -q {} -i {} -o {}",
+        "-d hw:{} -r {} -p {} -n {} -q {} -i {} -o {}",
         id, rate, psize, nperiods, quality, in_ports, out_ports
     );
     eprintln!("running audioadapter with: {}", args);
