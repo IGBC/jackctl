@@ -113,7 +113,6 @@ impl AudioMatrix {
             let mut curr_x = 2;
             vert.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, true);
-                l.set_angle(45.0);
                 grid.attach(&l, curr_x, 0, set.len() as i32, 1);
 
                 set.iter().enumerate().for_each(|(curr_x2, entry)| {
@@ -146,41 +145,49 @@ impl AudioMatrix {
 
             // Draw checkboxes
             let mut curr_x = 2;
-            let mut base_x = 2;
+            let base_x = 2;
             let mut curr_y = 2;
 
             // Iterate over the horizontal clients list
-            horz.iter().enumerate().for_each(|(i, (_, set_x))| {
-                //
+            horz.iter().enumerate().for_each(|(_i, (client_x, set_x))| {
                 // Then iterate over the horizontal ports for the current client
-                set_x.iter().for_each(|PortStateElement { id: id_x, .. }| {
-                    //
-                    // For each horizontal port, iterate over the vertical clients list
-                    vert.iter().for_each(|(_, set_y)| {
-                        //
-                        // Then iterate over the vertical ports of the current client
-                        set_y.iter().for_each(|PortStateElement { id: id_y, .. }| {
-                            let (cb, _) = utils::grid_checkbox(self.rt.clone(), id_x, id_y);
-                            cb.set_tooltip_text(Some(&format!(
-                                "curr_x: {}, curr_y: {}, base_x: {}",
-                                curr_x, curr_y, base_x
-                            )));
+                set_x.iter().for_each(
+                    |PortStateElement {
+                         id: id_x,
+                         port: port_x,
+                         ..
+                     }| {
+                        curr_x = base_x;
+                        // For each horizontal port, iterate over the vertical clients list
+                        vert.iter().enumerate().for_each(|(_j, (client_y, set_y))| {
+                            // Then iterate over the vertical ports of the current client
+                            set_y.iter().for_each(
+                                |PortStateElement {
+                                     id: id_y,
+                                     port: port_y,
+                                     ..
+                                 }| {
+                                    let (cb, _) = utils::grid_checkbox(self.rt.clone(), id_x, id_y);
+                                    cb.set_tooltip_text(Some(&format!(
+                                        "{}:{} x {}:{}",
+                                        client_x, port_x, client_y, port_y,
+                                    )));
 
-                            grid.attach(&cb, curr_x, curr_y, 1, 1);
+                                    grid.attach(&cb, curr_x, curr_y, 1, 1);
+                                    curr_x += 1;
+                                },
+                            );
+
+                            // Skip a col because of the divider
                             curr_x += 1;
                         });
-                    });
 
-                    // if i < num_vert_clients - 1 {
-                    //     grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_x, max_x, 1);
-                    // }
+                        curr_y += 1;
+                    },
+                );
 
-                    curr_x = base_x;
-                    curr_y += 1;
-                });
-
-                println!("Increment base_x");
-                base_x += 1;
+                // Skip a row because of the divider
+                curr_y += 1;
             });
         }
 
