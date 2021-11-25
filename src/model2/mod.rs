@@ -3,13 +3,15 @@
 pub mod card;
 pub mod events;
 pub mod port;
+pub mod settings;
 
 use self::card::{Card, CardId, CardStatus, CardUsage};
 use self::events::{HardwareCmd, HardwareEvent, JackCardAction, JackEvent, UiCmd, UiEvent};
 use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
-use crate::{settings::Settings, ui::UiHandle};
+use crate::ui::UiHandle;
 use async_std::task;
 use futures::FutureExt;
+use settings::Settings;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 

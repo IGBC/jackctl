@@ -114,7 +114,7 @@ impl Settings {
     }
 
     /// Wait to get exclusive write access to any settings
-    pub fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
+    pub(in crate::model2) fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
         WriteSettings { inner: self }
     }
 }
