@@ -65,7 +65,8 @@ impl JackServer {
                 .spawn()
                 .expect("Failed to start jack server");
 
-            thread::sleep(Duration::from_secs(1));
+            // wait for a moment for the server to start else the client might start first
+            thread::sleep(Duration::from_millis(100));
             Some(jack_proc)
         };
 
@@ -129,17 +130,31 @@ fn process_is_running(name: &str) -> bool {
     false
 }
 
+#[allow(unused)]
 #[cfg(test)]
 mod tests {
     use jack::{Client, PortFlags};
 
     // this ensures only one of these tests runs at once;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, MutexGuard};
     static SERVER_MUTEX: super::OnceCell<Mutex<()>> = super::OnceCell::new();
 
-    fn setup_test<'a>() -> &'a Mutex<()> {
+    fn setup_test<'a>() -> MutexGuard<'a, ()> {
         let _ = SERVER_MUTEX.set(Mutex::new(())); // or don't we expect this to fail a lot;
-        SERVER_MUTEX.get().unwrap()
+        match SERVER_MUTEX.get() {
+            Some(mutex) => match mutex.lock() {
+                Ok(g) => {
+                    return g;
+                }
+                Err(e) => {
+                    assert!(false, "Test mutex is poisoned {}", e);
+                }
+            },
+            None => {
+                assert!(false, "Test mutex is poisoned");
+            }
+        }
+        panic!();
     }
 
     fn launch_server() -> super::JackServer {
@@ -153,7 +168,6 @@ mod tests {
     #[test]
     fn check_server_launches() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
         let mut server = launch_server();
         assert!(super::process_is_running("jackd"));
         server.end();
@@ -162,9 +176,8 @@ mod tests {
     #[test]
     fn check_server_drops() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
         {
-            let _ = launch_server();
+            let v = launch_server();
             assert!(super::process_is_running("jackd"));
         }
         assert!(!super::process_is_running("jackd"));
@@ -173,7 +186,6 @@ mod tests {
     #[test]
     fn check_get_stdout() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
         let mut server = launch_server();
         assert!(server.stdout().is_some());
         server.end();
@@ -182,7 +194,6 @@ mod tests {
     #[test]
     fn check_get_stderr() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
         let mut server = launch_server();
         assert!(server.stderr().is_some());
         server.end();
@@ -191,8 +202,7 @@ mod tests {
     #[test]
     fn check_settings() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
-        let _ = launch_server();
+        let v = launch_server();
         let (client, _) =
             Client::new("jackctl_tests", jack::ClientOptions::NO_START_SERVER).unwrap();
         assert_eq!(client.sample_rate(), 44100);
@@ -202,8 +212,7 @@ mod tests {
     #[test]
     fn check_no_dummy_ports() {
         let mutex = setup_test();
-        let _lock = mutex.lock().unwrap();
-        let _ = launch_server();
+        let v = launch_server();
         let (client, _) =
             Client::new("jackctl_tests", jack::ClientOptions::NO_START_SERVER).unwrap();
         //get all ports
