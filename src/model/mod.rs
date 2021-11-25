@@ -224,12 +224,10 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
             Ok(h) => {
                 m.cards.get_mut(&card.id).unwrap().client_handle = Some(h);
             }
-            Err(e) => {
-                eprintln!(
-                    "[ERROR] Card {} Could not be started by jack: {}",
-                    card.id, e
-                )
-            }
+            Err(e) => eprintln!(
+                "[ERROR] Card {} Could not be started by jack: {}",
+                card.id, e
+            ),
         }
     }
 }

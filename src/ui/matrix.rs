@@ -32,20 +32,22 @@ fn count_map(map: &PortStateMap) -> (usize, usize) {
     )
 }
 
-pub(super) struct AudioMatrix {
+pub(super) struct Matrix {
     _in: PortState,
     out: PortState,
     dirty: AtomicBool,
     rt: UiRuntime,
+    page: &'static str,
 }
 
-impl AudioMatrix {
-    pub fn new(rt: UiRuntime) -> Self {
+impl Matrix {
+    pub fn new(rt: UiRuntime, page: &'static str) -> Self {
         Self {
             _in: Default::default(),
             out: Default::default(),
             dirty: AtomicBool::new(true),
             rt,
+            page,
         }
     }
 
@@ -194,6 +196,6 @@ impl AudioMatrix {
         self.dirty.fetch_and(false, Ordering::Relaxed);
 
         // Do magic things with grid
-        pages.insert_scrolled("Matrix", dbg!(&grid));
+        pages.insert_scrolled(self.page, dbg!(&grid));
     }
 }

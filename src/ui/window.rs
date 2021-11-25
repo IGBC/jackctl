@@ -4,7 +4,7 @@ use crate::{
         port::{Port, PortType},
     },
     settings::Settings,
-    ui::{about::About, matrix::AudioMatrix, pages::Pages, utils, UiRuntime, STYLE},
+    ui::{about::About, matrix::Matrix, pages::Pages, utils, UiRuntime, STYLE},
 };
 use async_std::task::block_on;
 use gio::ApplicationExt;
@@ -24,7 +24,8 @@ pub struct MainWindow {
     settings: Arc<Settings>,
     labels: Arc<Labels>,
     pages: Pages,
-    audio_matrix: AudioMatrix,
+    audio_matrix: Matrix,
+    midi_matrix: Matrix,
 }
 
 impl MainWindow {
@@ -34,7 +35,8 @@ impl MainWindow {
         let pages = Pages::new(builder, vec!["Matrix", "MIDI", "Mixer", "Setup"]);
 
         let this = MainWindow {
-            audio_matrix: AudioMatrix::new(rt.clone()),
+            audio_matrix: Matrix::new(rt.clone(), "Matrix"),
+            midi_matrix: Matrix::new(rt.clone(), "MIDI"),
             rt,
             inner,
             labels,
@@ -94,6 +96,7 @@ impl MainWindow {
 
         // ==^-^== Initially draw all UI elements ==^-^==
         self.audio_matrix.draw(&self.settings, &self.pages).await;
+        self.midi_matrix.draw(&self.settings, &self.pages).await;
         self.pages.show_all();
     }
 
@@ -115,6 +118,7 @@ impl MainWindow {
 
             // ==^-^== Then redraw all dirty elements ==^-^==
             self.audio_matrix.draw(&self.settings, &self.pages).await;
+            self.midi_matrix.draw(&self.settings, &self.pages).await;
             self.pages.show_all();
         });
 
@@ -136,7 +140,11 @@ impl MainWindow {
                         .add_port(id, dir, is_hw, client_name, port_name)
                         .await
                 }
-                // PortType::Midi => self.midi_matrix.add_port(id, input, client_name, port_name),
+                PortType::Midi => {
+                    self.midi_matrix
+                        .add_port(id, dir, is_hw, client_name, port_name)
+                        .await
+                }
                 PortType::Unknown | _ => {
                     println!("Unknown port type!");
                 }
