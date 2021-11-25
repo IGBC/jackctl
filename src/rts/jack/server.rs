@@ -66,7 +66,7 @@ impl JackServer {
                 .expect("Failed to start jack server");
 
             // wait for a moment for the server to start else the client might start first
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(500));
             Some(jack_proc)
         };
 
