@@ -34,12 +34,12 @@ impl MainWindow {
         let pages = Pages::new(builder, vec!["Matrix", "MIDI", "Mixer", "Setup"]);
 
         let this = MainWindow {
+            audio_matrix: AudioMatrix::new(rt.clone()),
             rt,
             inner,
             labels,
             pages,
             settings,
-            audio_matrix: AudioMatrix::new(),
         };
 
         // hook up the main dialog
@@ -156,6 +156,14 @@ impl MainWindow {
             UiCmd::AskCard(card) => {
                 println!("Ask the user whether we should use {:?}", card);
                 self.rt.sender().send(UiEvent::CardUsage(card, true));
+            }
+            UiCmd::AddConnection(a, b) => {
+                // TODO: add connection on audio matrix
+                // self.audio_matrix.add_connection(a, b).await;
+            }
+            UiCmd::DelConnection(a, b) => {
+                // TODO: remove connection on audio matrix
+                // self.audio_matrix.rm_connection(a, b).await;
             }
             _ => {}
         }

@@ -78,6 +78,8 @@ pub enum UiEvent {
     SetVolume(VolumeCmd),
     /// The user told us about their sound card
     CardUsage(Card, bool),
+    /// Add a connection between two ports
+    SetConnection(String, String, bool),
 }
 
 /// Commands from the model to manipulate the UI state

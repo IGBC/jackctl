@@ -6,7 +6,9 @@ pub mod port;
 pub mod settings;
 
 use self::card::{Card, CardId, CardStatus, CardUsage};
-use self::events::{HardwareCmd, HardwareEvent, JackCardAction, JackEvent, UiCmd, UiEvent};
+use self::events::{
+    HardwareCmd, HardwareEvent, JackCardAction, JackCmd, JackEvent, UiCmd, UiEvent,
+};
 use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
 use crate::ui::UiHandle;
 use async_std::task;
@@ -106,6 +108,15 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
             signal_jack_card(card, m).await;
         }
         CardUsage(Card { ref name, .. }, _) => m.settings.w().cards().set_card_usage(name, false),
+        SetConnection(input, output, connect) => {
+            m.jack_handle
+                .send_cmd(JackCmd::ConnectPorts {
+                    input,
+                    output,
+                    connect,
+                })
+                .await
+        }
     }
 }
 
@@ -152,8 +163,15 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
         DropCard { id } => {
             let card = m.cards.remove(&id).unwrap();
             match card.client_handle {
-                Some(id) => { let _ = m.jack_handle.send_card_action(JackCardAction::StopCard{ id }).await; },
-                None => { eprintln!("[Error]: Attempt to drop card that was never started, was there an error starting it?") }
+                Some(id) => {
+                    let _ = m
+                        .jack_handle
+                        .send_card_action(JackCardAction::StopCard { id })
+                        .await;
+                }
+                None => {
+                    eprintln!("[Error]: Attempt to drop card that was never started, was there an error starting it?")
+                }
             }
         }
         UpdateMixerVolume(volume) => {
@@ -203,8 +221,15 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
             })
             .await;
         match client_handle {
-            Ok(h) => { m.cards.get_mut(&card.id).unwrap().client_handle = Some(h); },
-            Err(e) => { eprintln!("[ERROR] Card {} Could not be started by jack: {}", card.id, e) }
+            Ok(h) => {
+                m.cards.get_mut(&card.id).unwrap().client_handle = Some(h);
+            }
+            Err(e) => {
+                eprintln!(
+                    "[ERROR] Card {} Could not be started by jack: {}",
+                    card.id, e
+                )
+            }
         }
     }
 }

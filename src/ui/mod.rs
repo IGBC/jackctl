@@ -50,6 +50,7 @@ impl EventSender {
     }
 }
 
+#[derive(Clone)]
 struct UiRuntime {
     tx_event: Sender<UiEvent>,
     rx_cmd: Receiver<UiCmd>,

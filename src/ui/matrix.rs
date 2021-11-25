@@ -1,7 +1,7 @@
 use crate::{
     model::port::{JackPortType, PortDirection},
-    settings::{Settings, IoOrder},
-    ui::{pages::Pages, utils},
+    settings::{IoOrder, Settings},
+    ui::{pages::Pages, utils, UiRuntime},
 };
 use async_std::sync::RwLock;
 use gtk::{prelude::*, Align, Orientation, Separator};
@@ -32,18 +32,20 @@ fn count_map(map: &PortStateMap) -> (usize, usize) {
     )
 }
 
-pub struct AudioMatrix {
+pub(super) struct AudioMatrix {
     _in: PortState,
     out: PortState,
     dirty: AtomicBool,
+    rt: UiRuntime,
 }
 
 impl AudioMatrix {
-    pub fn new() -> Self {
+    pub fn new(rt: UiRuntime) -> Self {
         Self {
             _in: Default::default(),
             out: Default::default(),
             dirty: AtomicBool::new(true),
+            rt,
         }
     }
 
@@ -68,6 +70,14 @@ impl AudioMatrix {
         self.dirty.fetch_or(true, Ordering::Relaxed);
     }
 
+    pub async fn add_connection(&self, a: JackPortType, b: JackPortType) {
+        todo!()
+    }
+
+    pub async fn rm_connection(&self, a: JackPortType, b: JackPortType) {
+        todo!()
+    }
+
     async fn is_empty(&self) -> bool {
         dbg!(self._in.read().await.is_empty()) || dbg!(self.out.read().await.is_empty())
     }
@@ -77,7 +87,7 @@ impl AudioMatrix {
         if !self.dirty.load(Ordering::Relaxed) {
             return;
         }
-        
+
         let grid = utils::grid();
         if self.is_empty().await {
             let l = utils::grid_label("No ports are currently available", false);
@@ -90,7 +100,7 @@ impl AudioMatrix {
                 IoOrder::VerticalInputs => (self._in.read().await, self.out.read().await),
                 IoOrder::HorizontalInputs => (self.out.read().await, self._in.read().await),
             };
-            
+
             let (num_vert_clients, num_vert_ports) = count_map(&vert);
             let (num_horz_clients, num_horz_ports) = count_map(&horz);
 
@@ -132,6 +142,24 @@ impl AudioMatrix {
                     grid.attach(&Separator::new(Orientation::Vertical), 0, curr_x, max_x, 1);
                 }
                 curr_y += set.len() as i32 + 1;
+            });
+
+            // Draw checkboxes
+            let mut curr_x = 2;
+            let mut curr_y = 2;
+            horz.iter().for_each(|(_, set_x)| {
+                set_x.iter().for_each(|PortStateElement { id: id_x, .. }| {
+                    vert.iter().for_each(|(_, set_y)| {
+                        set_y.iter().for_each(|PortStateElement { id: id_y, .. }| {
+                            let (cb, _) = utils::grid_checkbox(self.rt.clone(), id_x, id_y);
+                            grid.attach(&cb, curr_x, curr_y, 1, 1);
+                            curr_x += 1;
+                        });
+                    });
+
+                    curr_x = 2;
+                    curr_y += 1;
+                });
             });
         }
 
