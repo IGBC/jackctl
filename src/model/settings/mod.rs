@@ -114,7 +114,11 @@ impl Settings {
     }
 
     /// Wait to get exclusive write access to any settings
-    pub(in crate::model2) fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
+    ///
+    /// This function can only be called from the `model` tree to
+    /// avoid having the UI randomly change settings.  All settings
+    /// changes _must_ be performed in the model
+    pub(in crate::model) fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
         WriteSettings { inner: self }
     }
 }

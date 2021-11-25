@@ -1,4 +1,4 @@
-use crate::model2::events::JackCardAction;
+use crate::model::events::JackCardAction;
 use crate::rts::jack::JackRuntime;
 use jack::{Client, InternalClientID};
 use std::sync::Arc;

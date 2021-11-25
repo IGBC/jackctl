@@ -6,7 +6,7 @@ mod server;
 use self::async_client::JackNotificationController;
 use self::server::JackServer;
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
-use crate::model2::events::{JackCardAction, JackCmd, JackEvent};
+use crate::model::events::{JackCardAction, JackCmd, JackEvent};
 use crate::settings::Settings;
 use async_std::{
     channel::{bounded, Receiver, Sender},

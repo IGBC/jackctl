@@ -1,4 +1,4 @@
-use crate::{model2::card::CardUsage, settings::Id};
+use crate::{model::card::CardUsage, settings::Id};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

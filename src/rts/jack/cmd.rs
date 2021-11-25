@@ -1,4 +1,4 @@
-use crate::model2::events::{JackCmd, JackEvent, JackSettings};
+use crate::model::events::{JackCmd, JackEvent, JackSettings};
 use crate::rts::jack::JackRuntime;
 use jack::Client;
 use std::sync::Arc;

@@ -1,5 +1,5 @@
 use crate::{
-    model2::{
+    model::{
         events::{JackSettings, UiCmd, UiEvent},
         port::{Port, PortType},
     },

@@ -10,7 +10,7 @@ mod window;
 use window::MainWindow;
 
 use crate::{
-    model2::events::{UiCmd, UiEvent},
+    model::events::{UiCmd, UiEvent},
     settings::Settings,
 };
 use async_std::channel::{bounded, Receiver, Sender};

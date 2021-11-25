@@ -1,6 +1,6 @@
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
-use crate::model2::card::{CardConfig, CardId, ChannelCount, MixerChannel, SampleRate, Volume};
-use crate::model2::events::{HardwareCardAction, HardwareCmd, HardwareEvent, MuteCmd, VolumeCmd};
+use crate::model::card::{CardConfig, CardId, ChannelCount, MixerChannel, SampleRate, Volume};
+use crate::model::events::{HardwareCardAction, HardwareCmd, HardwareEvent, MuteCmd, VolumeCmd};
 use alsa::card::Card;
 use alsa::card::Iter as CardIter;
 use alsa::mixer::{Elem, Mixer, Selem, SelemChannelId, SelemId};

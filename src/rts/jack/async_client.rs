@@ -1,5 +1,5 @@
-use crate::model2::events::JackEvent;
-use crate::model2::port::{Port, PortDirection, PortType};
+use crate::model::events::JackEvent;
+use crate::model::port::{Port, PortDirection, PortType};
 use async_std::channel::Sender;
 use jack::Error as JackError;
 use jack::{NotificationHandler, Port as JackPort, PortFlags, PortId, Unowned};

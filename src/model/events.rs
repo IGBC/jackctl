@@ -1,6 +1,6 @@
 use crate::{
-    model2::card::{Card, CardConfig, CardId, ChannelId, MixerChannel, Volume},
-    model2::port::{JackPortType, Port},
+    model::card::{Card, CardConfig, CardId, ChannelId, MixerChannel, Volume},
+    model::port::{JackPortType, Port},
 };
 use jack::InternalClientID;
 

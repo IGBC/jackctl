@@ -1,5 +1,5 @@
 use crate::{
-    model2::port::{JackPortType, PortDirection},
+    model::port::{JackPortType, PortDirection},
     settings::{Settings, IoOrder},
     ui::{pages::Pages, utils},
 };
@@ -99,10 +99,11 @@ impl AudioMatrix {
             let max_x: i32 = 2 + num_vert_clients as i32 + num_vert_ports as i32 - 1;
             let max_y: i32 = 2 + num_horz_clients as i32 + num_horz_ports as i32 - 1;
 
-            // Draw input labels
+            // Draw vertical labels
             let mut curr_x = 2;
             vert.iter().enumerate().for_each(|(i, (client, set))| {
                 let l = utils::grid_label(client, true);
+                l.set_angle(45.0);
                 grid.attach(&l, curr_x, 0, set.len() as i32, 1);
 
                 set.iter().enumerate().for_each(|(curr_x2, entry)| {

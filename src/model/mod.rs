@@ -1,438 +1,210 @@
-//! Jackctl's Model and Event to drive the applications's MVC pattern
-use gdk::prelude::*;
+//! New model abstraction
+
+pub mod card;
+pub mod events;
+pub mod port;
+pub mod settings;
+
+use self::card::{Card, CardId, CardStatus, CardUsage};
+use self::events::{HardwareCmd, HardwareEvent, JackCardAction, JackEvent, UiCmd, UiEvent};
+use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
+use crate::ui::UiHandle;
+use async_std::task;
+use futures::FutureExt;
+use settings::Settings;
 use std::collections::HashMap;
-use std::sync::{mpsc, Arc, Mutex};
+use std::{collections::BTreeMap, sync::Arc};
 
-mod card;
-mod event;
-mod port;
+pub struct Model {
+    jack_handle: JackHandle,
+    ui_handle: UiHandle,
+    hw_handle: HardwareHandle,
+    settings: Arc<Settings>,
 
-pub use card::*;
-pub use event::Event;
-pub use port::*;
-
-/// Wrapper around a Mutexed Copy of the Model,
-/// use this instead of the model directly to
-/// easilly allow changes to the Mutex used.
-pub type Model = Arc<Mutex<ModelInner>>;
-
-/// Central Model of the MVC layout of the application,
-/// you Should only ever make one of these and pass
-/// mutexed references around to it.
-pub struct ModelInner {
-    tx: mpsc::Sender<Event>,
-    rx: mpsc::Receiver<Event>,
-
-    ixruns: u32,
-    pub layout_dirty: bool,
-
-    pub cpu_percent: f32,
-    pub sample_rate: u64,
-    pub buffer_size: u64,
-    pub latency: u64,
-
-    audio_inputs: PortGroup,
-    audio_outputs: PortGroup,
-    midi_inputs: PortGroup,
-    midi_outputs: PortGroup,
-    connections: Vec<Connection>,
-
-    pub cards: HashMap<i32, Card>,
+    /// Card data and state map
+    cards: BTreeMap<CardId, Card>,
 }
 
-impl ModelInner {
-    /// Returns a new model, in default state. Don't assume
-    /// anything is configured or initialised in this constructor.   
-    pub fn new() -> Model {
-        let (tx, rx) = mpsc::channel::<Event>();
-        let model = Arc::new(Mutex::new(ModelInner {
-            tx,
-            rx,
+impl Model {
+    /// Initialise a new model tree
+    pub fn start(
+        jack_handle: JackHandle,
+        ui_handle: UiHandle,
+        hw_handle: HardwareHandle,
+        settings: Arc<Settings>,
+    ) {
+        Self {
+            jack_handle,
+            ui_handle,
+            hw_handle,
+            settings,
+            cards: Default::default(),
+        }
+        .dispatch()
+    }
 
-            ixruns: 0,
-            layout_dirty: true,
-            cpu_percent: 0.0,
-            sample_rate: 0,
-            buffer_size: 0,
-            latency: 0,
-
-            audio_inputs: PortGroup::new(),
-            audio_outputs: PortGroup::new(),
-            midi_inputs: PortGroup::new(),
-            midi_outputs: PortGroup::new(),
-            connections: Vec::new(),
-
-            cards: HashMap::new(),
-        }));
-
-        let model_clone = model.clone();
-        glib::timeout_add_local(1, move || {
-            model_clone.lock().unwrap().update();
-            Continue(true)
+    fn dispatch(self) {
+        task::spawn(async move {
+            run(self).await;
+            println!("Model run loop shut down");
         });
-        model
     }
+}
 
-    pub fn get_pipe(&self) -> mpsc::Sender<Event> {
-        self.tx.clone()
+async fn run(mut m: Model) {
+    let jack_handle = m.jack_handle.clone();
+    let ui_handle = m.ui_handle.clone();
+    let hw_handle = m.hw_handle.clone();
+
+    loop {
+        let mut jack_event_poll = Box::pin(jack_handle.next_event().fuse());
+        let mut ui_event_poll = Box::pin(ui_handle.next_event().fuse());
+        let mut hw_event_poll = Box::pin(hw_handle.next_event().fuse());
+
+        futures::select! {
+            ev = jack_event_poll  => match ev {
+                Some(ev) => handle_jack_ev(&mut m, ev).await,
+                None => return,
+            },
+            ev = ui_event_poll  => match ev {
+                Some(ev) => handle_ui_ev(&mut m, ev).await,
+                None => return,
+            },
+            ev = hw_event_poll  => match ev {
+                Some(ev) => handle_hw_ev(&mut m, ev).await,
+                None => return,
+            },
+        }
     }
+}
 
-    fn update(&mut self) {
-        loop {
-            let evt = match self.rx.try_recv() {
-                Ok(e) => e,
-                Err(_) => {
-                    return;
-                }
+/// Events from the jack runtime
+async fn handle_jack_ev(m: &mut Model, ev: JackEvent) {
+    use JackEvent::*;
+    match ev {
+        XRun => m.ui_handle.send_cmd(UiCmd::IncrementXRun).await,
+        JackSettings(settings) => m.ui_handle.send_cmd(UiCmd::JackSettings(settings)).await,
+        AddPort(port) => m.ui_handle.send_cmd(UiCmd::AddPort(port)).await,
+        DelPort(id) => m.ui_handle.send_cmd(UiCmd::DelPort(id)).await,
+        AddConnection(a, b) => m.ui_handle.send_cmd(UiCmd::AddConnection(a, b)).await,
+        DelConnection(a, b) => m.ui_handle.send_cmd(UiCmd::DelConnection(a, b)).await,
+    }
+}
+
+/// Events from the UI runtime
+async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
+    use UiEvent::*;
+    match ev {
+        SetMuting(mute) => m.hw_handle.send_cmd(HardwareCmd::SetMixerMute(mute)).await,
+        SetVolume(volume) => {
+            m.hw_handle
+                .send_cmd(HardwareCmd::SetMixerVolume(volume))
+                .await
+        }
+        CardUsage(card, yes) if yes => {
+            m.settings.w().cards().set_card_usage(&card.name, true);
+            signal_jack_card(card, m).await;
+        }
+        CardUsage(Card { ref name, .. }, _) => m.settings.w().cards().set_card_usage(name, false),
+    }
+}
+
+/// Events from the hardware runtime
+async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
+    use HardwareEvent::*;
+    match ev {
+        NewCardFound {
+            id,
+            name,
+            capture,
+            playback,
+            mixerchannels,
+        } => {
+            let mut channels = HashMap::new();
+
+            for c in mixerchannels.iter() {
+                channels.insert(c.id, c.to_owned());
+            }
+
+            let card = Card {
+                id,
+                name: name.clone(),
+                capture,
+                playback,
+                channels,
+                client_handle: None,
+                state: CardStatus::New,
             };
 
-            match evt {
-                Event::XRun => self.increment_xruns(),
-                Event::ResetXruns => self.reset_xruns(),
-                Event::JackSettings(cpu_percent, sample_rate, buffer_size, latency) => {
-                    self.cpu_percent = cpu_percent;
-                    self.sample_rate = sample_rate;
-                    self.buffer_size = buffer_size;
-                    self.latency = latency
-                }
+            m.cards.insert(id, card.clone());
+            let usage = m.settings.r().cards().use_card(&name);
 
-                Event::AddCard(id, name) => {
-                    self.card_detected(id, name);
-                    self.layout_dirty = true;
+            match usage {
+                CardUsage::Yes => signal_jack_card(card, m).await,
+                CardUsage::No => {
+                    println!("Settings file told us not to use this card >:c");
                 }
-
-                Event::UseCard(id) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => card.state = CardStatus::Enum,
-                        None => eprintln!("Attempting to use non existing card {}", id),
-                    };
+                CardUsage::AskUser => {
+                    m.ui_handle.send_cmd(UiCmd::AskCard(card)).await;
                 }
-
-                Event::DontUseCard(id) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => card.state = CardStatus::DontUse,
-                        None => eprintln!("Attempting to ignore non existing card {}", id),
-                    };
-                }
-
-                Event::FinishEnumerateCard(id, inputs, outputs, channels) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => {
-                            card.inputs = inputs;
-                            card.outputs = outputs;
-                            for channel in channels {
-                                card.add_channel(channel);
-                            }
-                            card.state = CardStatus::Start;
-                        }
-                        None => {
-                            eprintln!("Attempting to sync enumeration of non existing card {}", id)
-                        }
-                    };
-                }
-
-                Event::FinishStartCard(id, client_handle) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => {
-                            card.client_handle = Some(client_handle);
-                            card.state = CardStatus::Active;
-                        }
-                        None => eprintln!(
-                            "Attempting to sync client handle of non existing card {}",
-                            id
-                        ),
-                    };
-                }
-
-                Event::FailEnumerateCard(id) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => {
-                            card.state = CardStatus::EnumFailed;
-                        }
-                        None => eprintln!("Attempting to fail non existing card {}", id),
-                    };
-                }
-
-                Event::FailStartCard(id) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => {
-                            card.state = CardStatus::StartFailed;
-                        }
-                        None => eprintln!("Attempting to fail non existing card {}", id),
-                    };
-                }
-
-                Event::StopCard(id) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => card.state = CardStatus::Stopping,
-                        None => eprintln!("Attempting to stop non existing card {}", id),
-                    };
-                }
-                Event::ForgetCard(id) => {
-                    self.cards.remove(&id);
-                }
-
-                Event::SetMuting(id, ch, m) => self.set_muting(id, ch, m),
-                Event::SetVolume(id, ch, v) => self.set_volume(id, ch, v),
-
-                Event::UpdateChannel(id, ch, v, m) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => match card.channels.get_mut(&ch) {
-                            Some(channel) => {
-                                channel.volume = v;
-                                channel.switch = m;
-                            }
-                            None => eprintln!(
-                                "Attempting to update non existing channel {} on card {}",
-                                ch, id
-                            ),
-                        },
-                        None => {
-                            eprintln!("Attempting to update channel on non existing card {}", id)
-                        }
-                    };
-                }
-
-                Event::CleanChannel(id, ch) => {
-                    match self.cards.get_mut(&id) {
-                        Some(card) => match card.channels.get_mut(&ch) {
-                            Some(channel) => {
-                                channel.dirty = false;
-                            }
-                            None => eprintln!(
-                                "Attempting to clean non existing channel {} on card {}",
-                                ch, id
-                            ),
-                        },
-                        None => {
-                            eprintln!("Attempting to clean channel on non existing card {}", id)
-                        }
-                    };
-                }
-
-                Event::AddAudioInput(i) => {
-                    self.audio_inputs.add(i);
-                    self.layout_dirty = true;
-                }
-                Event::AddAudioOutput(o) => {
-                    self.audio_outputs.add(o);
-                    self.layout_dirty = true;
-                }
-                Event::AddMidiInput(i) => {
-                    self.midi_inputs.add(i);
-                    self.layout_dirty = true;
-                }
-                Event::AddMidiOutput(o) => {
-                    self.midi_outputs.add(o);
-                    self.layout_dirty = true;
-                }
-
-                Event::DelPort(id) => {
-                    self.del_port(id);
-                    self.layout_dirty = true;
-                }
-
-                Event::AddConnection(idx, idy) => self.add_connection(idx, idy),
-                Event::DelConnection(idx, idy) => self.remove_connection(idx, idy),
             }
         }
-    }
-
-    fn increment_xruns(&mut self) {
-        self.ixruns += 1;
-    }
-
-    pub fn xruns(&self) -> u32 {
-        self.ixruns
-    }
-
-    fn reset_xruns(&mut self) {
-        self.ixruns = 0;
-    }
-
-    fn del_port(&mut self, id: JackPortType) {
-        if self.audio_inputs.remove_port_by_id(id) {
-            return;
-        };
-        if self.audio_outputs.remove_port_by_id(id) {
-            return;
-        };
-        if self.midi_inputs.remove_port_by_id(id) {
-            return;
-        };
-        if self.midi_outputs.remove_port_by_id(id) {
-            return;
-        };
-    }
-
-    pub fn audio_inputs(&self) -> &PortGroup {
-        &self.audio_inputs
-    }
-
-    pub fn audio_outputs(&self) -> &PortGroup {
-        &self.audio_outputs
-    }
-
-    pub fn midi_inputs(&self) -> &PortGroup {
-        &self.midi_inputs
-    }
-
-    pub fn midi_outputs(&self) -> &PortGroup {
-        &self.midi_outputs
-    }
-
-    pub fn inputs(&self) -> PortGroup {
-        self.audio_inputs.merge(&self.midi_inputs)
-    }
-
-    pub fn outputs(&self) -> PortGroup {
-        self.audio_outputs.merge(&self.midi_outputs)
-    }
-
-    fn find_port(&self, id: JackPortType) -> Option<&Port> {
-        match self.audio_inputs.get_port_by_id(id) {
-            Some(port) => return Some(port),
-            None => (),
+        DropCard { id } => {
+            let card = m.cards.remove(&id).unwrap();
+            match card.client_handle {
+                Some(id) => { let _ = m.jack_handle.send_card_action(JackCardAction::StopCard{ id }).await; },
+                None => { eprintln!("[Error]: Attempt to drop card that was never started, was there an error starting it?") }
+            }
         }
-        match self.audio_outputs.get_port_by_id(id) {
-            Some(port) => return Some(port),
-            None => (),
-        }
-        match self.midi_inputs.get_port_by_id(id) {
-            Some(port) => return Some(port),
-            None => (),
-        }
-        match self.midi_outputs.get_port_by_id(id) {
-            Some(port) => return Some(port),
-            None => (),
-        }
-        None
-    }
-
-    fn add_connection(&mut self, idx: JackPortType, idy: JackPortType) {
-        let input = match self.find_port(idx) {
-            Some(p) => p,
-            None => {
-                eprintln!(
-                    "ERROR: Attempting to connect from non existant port {}",
-                    idx
+        UpdateMixerVolume(volume) => {
+            let c = m.cards.get_mut(&volume.card).unwrap();
+            let chan = c.channels.get_mut(&volume.channel).unwrap();
+            let oldv = chan.volume;
+            if volume.volume != oldv {
+                println!(
+                    "Volume Different {} - {}: {}",
+                    volume.volume, c.name, chan.name
                 );
-                return;
+                chan.volume = volume.volume;
+                m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await;
             }
-        };
-
-        let output = match self.find_port(idy) {
-            Some(p) => p,
-            None => {
-                eprintln!(
-                    "ERROR: Attempting to connect to non existant port {} from port \"{}\" ",
-                    idy,
-                    input.fullname()
-                );
-                return;
-            }
-        };
-
-        let new_connection: Connection = Connection {
-            input: idx,
-            output: idy,
-        };
-        if self.connections.contains(&new_connection) {
-            eprintln!(
-                "ERROR Attempting to connect {} to {} -> already connected",
-                input.fullname(),
-                output.fullname()
-            );
-        } else {
-            self.connections.push(new_connection);
         }
-    }
-
-    fn remove_connection(&mut self, input: JackPortType, output: JackPortType) {
-        let old_connection = Connection { input, output };
-        match self.connections.iter().position(|r| r == &old_connection) {
-            Some(i) => {
-                self.connections.remove(i);
-            }
-            None => {
-                eprintln!(
-                    "error trying to remove non existing connection between ports {} and {}",
-                    input, output
-                );
+        UpdateMixerMute(mute) => {
+            let c = m.cards.get_mut(&mute.card).unwrap();
+            let chan = c.channels.get_mut(&mute.channel).unwrap();
+            let oldm = chan.switch;
+            if mute.mute != oldm {
+                println!("Mute Different {} - {}: {}", mute.mute, c.name, chan.name);
+                chan.switch = mute.mute;
+                m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
             }
         }
     }
+}
 
-    // call when a card is to be added to the system that has not been seen before.
-    fn card_detected(&mut self, id: i32, name: String) {
-        println!("Found Unseen Card hw:{} - {}", id, name);
-        let card = Card::new(id, name);
-        self.cards.insert(id, card);
-    }
+async fn signal_jack_card(card: Card, m: &mut Model) {
+    let capture = card.capture();
+    let playback = card.playback();
 
-    // TODO: make this work with just ID's
-    pub fn connected_by_id(&self, id1: JackPortType, id2: JackPortType) -> bool {
-        let outputs = self.outputs();
-        let inputs = self.inputs();
-        let output_name = outputs.get_port_by_id(id1);
-        let input_name = inputs.get_port_by_id(id2);
-        if output_name.is_none() || input_name.is_none() {
-            return false;
+    if let (Some((r_in, n_in)), Some((r_out, n_out))) = (capture, playback) {
+        if r_in != r_out {
+            println!("[WARNING] IN rate is not equal to OUT rate");
         }
 
-        let output_name = output_name.unwrap();
-        let input_name = input_name.unwrap();
-        for c in self.connections.iter() {
-            if (c.input == input_name.id()) && (c.output == output_name.id()) {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn set_muting(&mut self, card_id: i32, channel: u32, mute: bool) {
-        let card = self.cards.get_mut(&card_id);
-        if card.is_some() {
-            let card = card.unwrap();
-            let channel = card.channels.get_mut(&channel);
-            if channel.is_some() {
-                let mut channel = channel.unwrap();
-                channel.switch = mute;
-                channel.dirty = true;
-            }
-        }
-    }
-
-    fn set_volume(&mut self, card_id: i32, channel: u32, volume: i64) {
-        let card = self.cards.get_mut(&card_id);
-        if card.is_some() {
-            let card = card.unwrap();
-            let channel = card.channels.get_mut(&channel);
-            if channel.is_some() {
-                let mut channel = channel.unwrap();
-                channel.volume = volume;
-                channel.dirty = true;
-            }
-        }
-    }
-
-    pub fn get_muting(&self, card_id: i32, channel: u32) -> bool {
-        match self.cards.get(&card_id) {
-            Some(card) => match card.channels.get(&channel) {
-                Some(channel) => channel.switch,
-                None => false,
-            },
-            None => false,
-        }
-    }
-
-    pub fn get_volume(&self, card_id: i32, channel: u32) -> i64 {
-        match self.cards.get(&card_id) {
-            Some(card) => match card.channels.get(&channel) {
-                Some(channel) => channel.volume,
-                None => 0,
-            },
-            None => 0,
+        // Inform Jack here
+        let client_handle = m
+            .jack_handle
+            .send_card_action(JackCardAction::StartCard {
+                id: card.id.to_string(),
+                name: card.name,
+                rate: r_in, // FIXME: AAAAAAAAAAAAAAAAAAAAAAAH!
+                in_ports: n_in,
+                out_ports: n_out,
+            })
+            .await;
+        match client_handle {
+            Ok(h) => { m.cards.get_mut(&card.id).unwrap().client_handle = Some(h); },
+            Err(e) => { eprintln!("[ERROR] Card {} Could not be started by jack: {}", card.id, e) }
         }
     }
 }

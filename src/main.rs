@@ -2,12 +2,12 @@
 
 mod cb_channel;
 mod error;
-mod model2;
+mod model;
 mod rts;
 mod ui;
 
 use gio::prelude::*;
-use model2::{
+use model::{
     settings::{self, Settings},
     Model,
 };
