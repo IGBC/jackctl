@@ -146,20 +146,41 @@ impl AudioMatrix {
 
             // Draw checkboxes
             let mut curr_x = 2;
+            let mut base_x = 2;
             let mut curr_y = 2;
-            horz.iter().for_each(|(_, set_x)| {
+
+            // Iterate over the horizontal clients list
+            horz.iter().enumerate().for_each(|(i, (_, set_x))| {
+                //
+                // Then iterate over the horizontal ports for the current client
                 set_x.iter().for_each(|PortStateElement { id: id_x, .. }| {
+                    //
+                    // For each horizontal port, iterate over the vertical clients list
                     vert.iter().for_each(|(_, set_y)| {
+                        //
+                        // Then iterate over the vertical ports of the current client
                         set_y.iter().for_each(|PortStateElement { id: id_y, .. }| {
                             let (cb, _) = utils::grid_checkbox(self.rt.clone(), id_x, id_y);
+                            cb.set_tooltip_text(Some(&format!(
+                                "curr_x: {}, curr_y: {}, base_x: {}",
+                                curr_x, curr_y, base_x
+                            )));
+
                             grid.attach(&cb, curr_x, curr_y, 1, 1);
                             curr_x += 1;
                         });
                     });
 
-                    curr_x = 2;
+                    // if i < num_vert_clients - 1 {
+                    //     grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_x, max_x, 1);
+                    // }
+
+                    curr_x = base_x;
                     curr_y += 1;
                 });
+
+                println!("Increment base_x");
+                base_x += 1;
             });
         }
 
@@ -168,17 +189,4 @@ impl AudioMatrix {
         // Do magic things with grid
         pages.insert_scrolled("Matrix", dbg!(&grid));
     }
-
-    // This function updates the matrix based on the current model
-    // pub fn update(
-    //     &mut self,
-    //     pages: &mut Pages,
-    //     inputs: &PortGroup,
-    //     horzputs: &PortGroup,
-    // ) {
-    //     let (grid, callbacks) = utils::generate_grid(jack, inputs, horzputs);
-    //     pages.remove_page("Matrix");
-    //     pages.insert_scrolled("Matrix", &grid);
-    //     self.inner = callbacks;
-    // }
 }
