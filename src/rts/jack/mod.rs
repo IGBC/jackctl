@@ -44,11 +44,18 @@ impl JackHandle {
     ) -> Result<InternalClientID, jack::Error> {
         self.card_tx.send(action).await.unwrap()
     }
+
+    pub fn close(&self) {
+        self.cmd_tx.close();
+        self.event_rx.close();
+        self.card_tx.close();
+    }
 }
 
 /// Jack server runtime and signalling state
 #[derive(Debug)]
 pub struct JackRuntime {
+    #[allow(unused)]
     /// reference for the jack server, server will stop when dropped
     server: JackServer,
     /// Resample Quality fetched from settings on boot

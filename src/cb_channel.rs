@@ -28,6 +28,7 @@ pub fn bounded<T, R>(buffer: usize) -> (ReturningSender<T, R>, ReturningReceiver
     (tx, rx)
 }
 
+#[allow(dead_code)]
 pub fn unbounded<T, R>() -> (ReturningSender<T, R>, ReturningReceiver<T, R>) {
     let (sender, receiver) = channel::unbounded();
     let tx = ReturningSender { sender };

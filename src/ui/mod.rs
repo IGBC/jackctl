@@ -97,5 +97,6 @@ pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHa
     let (rt, handle) = UiRuntime::new();
     let builder = Builder::from_string(GLADEFILE);
     let (win, app) = window::create(settings, builder, rt);
+    let _ = card_query::CardQuery::new(&app);
     (win, app, handle)
 }

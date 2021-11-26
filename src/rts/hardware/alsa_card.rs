@@ -58,6 +58,12 @@ impl AlsaHandle {
             println!("Failed to send CMD to hardware runtime!");
         }
     }
+
+    pub fn close(&self) {
+        self.cmd_tx.close();
+        self.event_rx.close();
+        self.card_tx.close();
+    }
 }
 
 pub struct AlsaController {
@@ -130,6 +136,11 @@ impl AlsaController {
                     let playback = selem.has_playback_switch();
 
                     Self::set_muting(playback, &selem, mute.mute);
+                }
+
+                HardwareCmd::Shutdown => {
+                    // Exit the event loop now.
+                    break;
                 }
             }
         }

@@ -80,6 +80,8 @@ pub enum UiEvent {
     CardUsage(Card, bool),
     /// Add a connection between two ports
     SetConnection(String, String, bool),
+    /// The user has requested the program to end
+    Shutdown,
 }
 
 /// Commands from the model to manipulate the UI state
@@ -103,12 +105,15 @@ pub enum UiCmd {
     DelConnection(JackPortType, JackPortType),
     /// Ask the user about their sound card
     AskCard(Card),
+    /// The Model Has finished a shutdown request the main loop must be terminated immediately
+    YouDontHaveToGoHomeButYouCantStayHere,
 }
 
 #[derive(Clone, Debug)]
 pub enum HardwareCmd {
     SetMixerVolume(VolumeCmd),
     SetMixerMute(MuteCmd),
+    Shutdown,
 }
 
 #[derive(Clone, Debug)]

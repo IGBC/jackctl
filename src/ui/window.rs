@@ -19,6 +19,7 @@ use std::sync::{
 };
 
 pub struct MainWindow {
+    app: Application,
     inner: Window,
     rt: UiRuntime,
     settings: Arc<Settings>,
@@ -29,10 +30,19 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
-    fn new(settings: Arc<Settings>, builder: &Builder, rt: UiRuntime) -> Arc<Self> {
+    fn new(
+        app: &Application,
+        settings: Arc<Settings>,
+        builder: &Builder,
+        rt: UiRuntime,
+    ) -> Arc<Self> {
         let inner = utils::get_object(builder, "maindialog");
         let labels = Labels::new(builder, &rt);
         let pages = Pages::new(builder, vec!["Matrix", "MIDI", "Mixer", "Setup"]);
+
+        let quit: ModelButton = utils::get_object(&builder, "quit.mainmenu");
+        let rtt = rt.clone();
+        quit.connect_clicked(move |_| rtt.sender().send(UiEvent::Shutdown));
 
         let this = MainWindow {
             audio_matrix: Matrix::new(rt.clone(), "Matrix"),
@@ -42,6 +52,7 @@ impl MainWindow {
             labels,
             pages,
             settings,
+            app: app.clone(),
         };
 
         // hook up the main dialog
@@ -65,20 +76,6 @@ impl MainWindow {
 
         let this = Arc::clone(self);
         app.connect_startup(move |app| {
-            // The CSS "magic" happens here.
-            let provider = gtk::CssProvider::new();
-            provider
-                .load_from_data(STYLE.as_bytes())
-                .expect("Failed to load CSS");
-
-            // We give the CssProvided to the default screen so the CSS rules we added
-            // can be applied to our window.
-            gtk::StyleContext::add_provider_for_screen(
-                &gdk::Screen::get_default().expect("Error initializing gtk css provider."),
-                &provider,
-                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-
             this.inner.set_application(Some(app));
             block_on(async { this.setup_ui(app, &builder).await });
         });
@@ -90,10 +87,6 @@ impl MainWindow {
     ///
     /// Don't call it from outside this type!
     async fn setup_ui(&self, app: &Application, builder: &Builder) {
-        let quit: ModelButton = utils::get_object(&builder, "quit.mainmenu");
-        let app = app.clone();
-        quit.connect_clicked(move |_| app.quit());
-
         // ==^-^== Initially draw all UI elements ==^-^==
         self.audio_matrix.draw(&self.settings, &self.pages).await;
         self.midi_matrix.draw(&self.settings, &self.pages).await;
@@ -149,6 +142,7 @@ impl MainWindow {
                     println!("Unknown port type!");
                 }
             },
+            UiCmd::DelPort(port) => {}
             UiCmd::IncrementXRun => self.labels.increment_xruns(),
             UiCmd::JackSettings(JackSettings {
                 cpu_percentage,
@@ -163,6 +157,7 @@ impl MainWindow {
             }
             UiCmd::AskCard(card) => {
                 println!("Ask the user whether we should use {:?}", card);
+                let _ = super::card_query::CardQuery::new(&self.app);
                 self.rt.sender().send(UiEvent::CardUsage(card, true));
             }
             UiCmd::AddConnection(a, b) => {
@@ -173,7 +168,11 @@ impl MainWindow {
                 // TODO: remove connection on audio matrix
                 // self.audio_matrix.rm_connection(a, b).await;
             }
-            _ => {}
+            UiCmd::MuteChange(m) => {}
+            UiCmd::VolumeChange(v) => {}
+            UiCmd::YouDontHaveToGoHomeButYouCantStayHere => {
+                self.app.quit();
+            }
         }
     }
 }
@@ -278,7 +277,7 @@ pub(super) fn create(
 ) -> (Arc<MainWindow>, Application) {
     let app = Application::new(Some("jackctl.segfault"), Default::default())
         .expect("Failed to initialise Gtk application!");
-    let win = MainWindow::new(settings, &builder, rt);
+    let win = MainWindow::new(&app, settings, &builder, rt);
     win.setup_application(&app, builder);
     (win, app)
 }

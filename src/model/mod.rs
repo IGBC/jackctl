@@ -11,7 +11,7 @@ use self::events::{
 };
 use crate::rts::{hardware::HardwareHandle, jack::JackHandle};
 use crate::ui::UiHandle;
-use async_std::task;
+use async_std::{channel, task};
 use futures::FutureExt;
 use settings::Settings;
 use std::collections::HashMap;
@@ -25,6 +25,9 @@ pub struct Model {
 
     /// Card data and state map
     cards: BTreeMap<CardId, Card>,
+
+    /// exit condtion bit
+    done: bool,
 }
 
 impl Model {
@@ -41,6 +44,7 @@ impl Model {
             hw_handle,
             settings,
             cards: Default::default(),
+            done: false,
         }
         .dispatch()
     }
@@ -53,15 +57,27 @@ impl Model {
     }
 }
 
+async fn next_ctrlc(h: &channel::Receiver<()>) -> Option<()> {
+    h.recv().await.ok()
+}
+
 async fn run(mut m: Model) {
     let jack_handle = m.jack_handle.clone();
     let ui_handle = m.ui_handle.clone();
     let hw_handle = m.hw_handle.clone();
+    let (tx, ctrlc_handle_rx) = channel::bounded::<()>(1);
 
-    loop {
+    let _ = ctrlc::set_handler(move || {
+        task::block_on(async {
+            let _ = tx.send(()).await;
+        });
+    });
+
+    while !m.done {
         let mut jack_event_poll = Box::pin(jack_handle.next_event().fuse());
         let mut ui_event_poll = Box::pin(ui_handle.next_event().fuse());
         let mut hw_event_poll = Box::pin(hw_handle.next_event().fuse());
+        let mut ctlc_event_poll = Box::pin(next_ctrlc(&ctrlc_handle_rx).fuse());
 
         futures::select! {
             ev = jack_event_poll  => match ev {
@@ -75,6 +91,10 @@ async fn run(mut m: Model) {
             ev = hw_event_poll  => match ev {
                 Some(ev) => handle_hw_ev(&mut m, ev).await,
                 None => return,
+            },
+            _ = ctlc_event_poll => {
+                println!("=== Recieved Ctrl-C, Shutting Down ===");
+                end_program(&mut m).await;
             },
         }
     }
@@ -117,7 +137,23 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
                 })
                 .await
         }
+        Shutdown => {
+            println!("=== Recieved Shutdown Event ===");
+            end_program(m).await;
+        }
     }
+}
+
+async fn end_program(m: &mut Model) {
+    m.jack_handle.send_cmd(JackCmd::Shutdown).await;
+    m.jack_handle.close();
+    m.hw_handle.send_cmd(HardwareCmd::Shutdown).await;
+    m.hw_handle.close();
+    println!("=== Sending Terminate Request ===");
+    m.ui_handle
+        .send_cmd(UiCmd::YouDontHaveToGoHomeButYouCantStayHere)
+        .await;
+    m.done = true;
 }
 
 /// Events from the hardware runtime
