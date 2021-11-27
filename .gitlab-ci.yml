@@ -16,4 +16,3 @@ rust-latest:
   stage: build
   script:
     - cargo build
-    - cargo test -- --nocapture
