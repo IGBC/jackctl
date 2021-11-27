@@ -157,7 +157,7 @@ impl MainWindow {
             }
             UiCmd::AskCard(card) => {
                 println!("Ask the user whether we should use {:?}", card);
-                let _ = super::card_query::CardQuery::new(&self.app);
+                let _ = super::card_query::CardQuery::new(&self.app, &self.inner);
                 self.rt.sender().send(UiEvent::CardUsage(card, true));
             }
             UiCmd::AddConnection(a, b) => {
