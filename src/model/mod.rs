@@ -204,6 +204,8 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
                         .jack_handle
                         .send_card_action(JackCardAction::StopCard { id })
                         .await;
+
+                    //m.ui_handle.send_cmd(UiCmd::DelCard(id));
                 }
                 None => {
                     eprintln!("[Error]: Attempt to drop card that was never started, was there an error starting it?")
@@ -237,8 +239,8 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
 }
 
 async fn signal_jack_card(card: Card, m: &mut Model) {
-    let capture = card.capture();
-    let playback = card.playback();
+    let capture = card.capture().clone();
+    let playback = card.playback().clone();
 
     if let (Some((r_in, n_in)), Some((r_out, n_out))) = (capture, playback) {
         if r_in != r_out {
@@ -250,7 +252,7 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
             .jack_handle
             .send_card_action(JackCardAction::StartCard {
                 id: card.id.to_string(),
-                name: card.name,
+                name: card.name.clone(),
                 rate: r_in, // FIXME: AAAAAAAAAAAAAAAAAAAAAAAH!
                 in_ports: n_in,
                 out_ports: n_out,
@@ -259,6 +261,7 @@ async fn signal_jack_card(card: Card, m: &mut Model) {
         match client_handle {
             Ok(h) => {
                 m.cards.get_mut(&card.id).unwrap().client_handle = Some(h);
+                m.ui_handle.send_cmd(UiCmd::AddCard(card)).await;
             }
             Err(e) => eprintln!(
                 "[ERROR] Card {} Could not be started by jack: {}",

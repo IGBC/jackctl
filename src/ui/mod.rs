@@ -3,6 +3,7 @@
 mod about;
 mod card_query;
 mod matrix;
+mod mixer;
 mod pages;
 mod utils;
 mod window;
@@ -17,7 +18,6 @@ use async_std::channel::{bounded, Receiver, Sender};
 use gtk::{Application, Builder};
 use std::sync::Arc;
 
-const STYLE: &str = include_str!("../jackctl.css");
 const GLADEFILE: &str = include_str!("../jackctl.glade");
 
 #[derive(Clone)]

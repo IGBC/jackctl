@@ -2,7 +2,7 @@ use crate::{model::port::JackPortType, ui::UiRuntime};
 use glib::{object::IsA, SignalHandlerId};
 use gtk::{
     prelude::BuilderExtManual, Adjustment, Align, Builder, ButtonExt, CheckButton, ContainerExt,
-    Grid, Label, LabelExt, ScrolledWindow, ScrolledWindowExt, Viewport, ViewportExt, WidgetExt,
+    Grid, Label, LabelExt, ScrolledWindow, ScrolledWindowExt, Viewport, ViewportExt, WidgetExt, Widget,
 };
 
 pub(super) fn get_object<T>(builder: &Builder, name: &str) -> T
@@ -83,4 +83,11 @@ pub(super) fn grid_checkbox(
         // rt.sender().send(UiEvent::SetConnection(id1, id2, true));
     });
     (button, signal_id)
+}
+
+pub(super) fn margin<P: IsA<Widget>>(widget: &P, margin: i32) {
+    widget.set_margin_top(margin);
+    widget.set_margin_start(margin);
+    widget.set_margin_bottom(margin);
+    widget.set_margin_end(margin);
 }

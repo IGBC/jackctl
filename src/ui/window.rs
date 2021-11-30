@@ -4,14 +4,14 @@ use crate::{
         port::{Port, PortType},
     },
     settings::Settings,
-    ui::{about::About, matrix::Matrix, pages::Pages, utils, UiRuntime, STYLE},
+    ui::{about::About, matrix::Matrix, mixer::Mixer, pages::Pages, utils, UiRuntime},
 };
 use async_std::task::block_on;
 use gio::ApplicationExt;
 use glib::Continue;
 use gtk::{
-    Application, Builder, Button, ButtonExt, CssProviderExt, GtkWindowExt, Label, LabelExt,
-    LevelBar, LevelBarExt, ModelButton, WidgetExt, Window,
+    Application, Builder, Button, ButtonExt, GtkWindowExt, Label, LabelExt, LevelBar, LevelBarExt,
+    ModelButton, WidgetExt, Window,
 };
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -27,6 +27,7 @@ pub struct MainWindow {
     pages: Pages,
     audio_matrix: Matrix,
     midi_matrix: Matrix,
+    mixer: Mixer,
 }
 
 impl MainWindow {
@@ -47,6 +48,7 @@ impl MainWindow {
         let this = MainWindow {
             audio_matrix: Matrix::new(rt.clone(), "Matrix"),
             midi_matrix: Matrix::new(rt.clone(), "MIDI"),
+            mixer: Mixer::new(rt.clone()),
             rt,
             inner,
             labels,
@@ -112,6 +114,7 @@ impl MainWindow {
             // ==^-^== Then redraw all dirty elements ==^-^==
             self.audio_matrix.draw(&self.settings, &self.pages).await;
             self.midi_matrix.draw(&self.settings, &self.pages).await;
+            self.mixer.draw(&self.pages).await;
             self.pages.show_all();
         });
 
@@ -170,6 +173,12 @@ impl MainWindow {
             }
             UiCmd::MuteChange(m) => {}
             UiCmd::VolumeChange(v) => {}
+            UiCmd::AddCard(c) => {
+                self.mixer.add_card(c).await;
+            }
+            UiCmd::DelCard(id) => {
+                self.mixer.del_card(id).await;
+            }
             UiCmd::YouDontHaveToGoHomeButYouCantStayHere => {
                 self.app.quit();
             }

@@ -10,7 +10,7 @@ pub type ChannelCount = u32;
 /// Struct representing a sound card in the model
 #[derive(Clone, Debug)]
 pub struct Card {
-    pub id: i32,
+    pub id: CardId,
     pub client_handle: Option<u64>,
     pub capture: Option<CardConfig>, // option contains best sample rate
     pub playback: Option<CardConfig>, // option contains best sample rate
@@ -20,12 +20,12 @@ pub struct Card {
 }
 
 impl Card {
-    pub fn capture(&self) -> Option<(u32, u32)> {
+    pub fn capture(&self) -> Option<(SampleRate, ChannelCount)> {
         let cfg = self.capture.as_ref()?;
         Some((cfg.sample_rate, cfg.channels))
     }
 
-    pub fn playback(&self) -> Option<(u32, u32)> {
+    pub fn playback(&self) -> Option<(SampleRate, ChannelCount)> {
         let cfg = self.playback.as_ref()?;
         Some((cfg.sample_rate, cfg.channels))
     }
@@ -33,8 +33,8 @@ impl Card {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CardConfig {
-    pub sample_rate: u32,
-    pub channels: u32,
+    pub sample_rate: SampleRate,
+    pub channels: ChannelCount,
 }
 
 /// Indicate whether a sound card should be used or not

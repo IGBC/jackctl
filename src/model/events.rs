@@ -103,6 +103,10 @@ pub enum UiCmd {
     AddConnection(JackPortType, JackPortType),
     /// Delete a connection between ports
     DelConnection(JackPortType, JackPortType),
+    /// Tell Mixer we found a new sound card
+    AddCard(Card),
+    /// Tell Mixer we lost a card
+    DelCard(CardId),
     /// Ask the user about their sound card
     AskCard(Card),
     /// The Model Has finished a shutdown request the main loop must be terminated immediately
