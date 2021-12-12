@@ -1,16 +1,29 @@
 /// Implements The UI logic for the ALSAMixer Style Sound Device Ctl interface.
 use super::{pages::Pages, utils, UiRuntime};
-use crate::model::card::{Card, CardId, CardStatus, MixerChannel};
+use crate::model::card::{Card, CardId, ChannelId, MixerChannel, Volume};
+use crate::model::events::{MuteCmd, UiEvent, VolumeCmd};
 
+use glib::SignalHandlerId;
 use gtk::prelude::*;
-use gtk::{Adjustment, Align, Orientation, PositionType, Scale, ScaleBuilder, Separator};
+use gtk::{
+    Adjustment, Align, Orientation, PositionType, Scale, ScaleBuilder, Separator, ToggleButton,
+};
 
 use async_std::sync::RwLock;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+struct MixerHandle {
+    mute_button: Option<ToggleButton>,
+    mute_handle: Option<SignalHandlerId>,
+    scale_handle: SignalHandlerId,
+    volume_setting: Adjustment,
+}
+
 pub(super) struct Mixer {
     cards: RwLock<HashMap<CardId, Card>>,
+    handles: RwLock<BTreeMap<(CardId, ChannelId), MixerHandle>>,
     dirty: AtomicBool,
     rt: UiRuntime,
 }
@@ -22,6 +35,7 @@ impl Mixer {
             rt,
             dirty: AtomicBool::new(true),
             cards: RwLock::new(HashMap::new()),
+            handles: RwLock::new(BTreeMap::new()),
         }
     }
 
@@ -36,11 +50,42 @@ impl Mixer {
         self.dirty.fetch_or(true, Ordering::Relaxed);
     }
 
+    pub async fn update_volume(&self, id: CardId, channel: ChannelId, volume: Volume) {
+        self.update_parameter(id, channel, |handle| {
+            handle.volume_setting.set_value(volume as f64);
+        })
+        .await;
+    }
+
+    pub async fn update_mute(&self, id: CardId, channel: ChannelId, mute: bool) {
+        self.update_parameter(id, channel, |handle| {
+            if handle.mute_button.is_some() {
+                let signal = handle.mute_handle.as_ref().unwrap();
+                let button = handle.mute_button.as_ref().unwrap();
+                button.block_signal(signal);
+                button.set_active(mute);
+                button.unblock_signal(signal);
+            } else {
+                println!("attempting to set mute on channel that doesn't have one");
+            }
+        })
+        .await;
+    }
+
+    async fn update_parameter(&self, id: CardId, channel: ChannelId, cb: impl Fn(&MixerHandle)) {
+        match self.handles.read().await.get(&(id, channel)) {
+            Some(handle) => {
+                cb(handle);
+            }
+            None => println!("Attempt to set parameter on missing mixer thing"),
+        }
+    }
+
     pub async fn draw(&self, pages: &Pages) {
         if !self.dirty.load(Ordering::Relaxed) {
             return;
         }
-        
+
         println!("drawing mixer");
         let cards = self.cards.read().await;
 
@@ -50,16 +95,19 @@ impl Mixer {
         grid.set_vexpand(true);
         if cards.is_empty() {
             grid.attach(
-                &utils::mixer_label("No controllable devices are detected.", false),0,0,1,1);
+                &utils::mixer_label("No controllable devices are detected.", false),
+                0,
+                0,
+                1,
+                1,
+            );
         } else {
             let mut x_pos = 0;
             // get the elements in order.
             let mut keys: Vec<&i32> = cards.keys().collect();
             keys.sort();
-            for card in keys
-                .iter()
-                .map(|k| cards.get(*k).unwrap())
-                //.filter(|x| x.state == CardStatus::Active)
+            for card in keys.iter().map(|k| cards.get(*k).unwrap())
+            //.filter(|x| x.state == CardStatus::Active)
             {
                 let len = card.channels.len();
                 if len == 0 {
@@ -94,24 +142,31 @@ impl Mixer {
                     for channel in keys {
                         grid.attach(&utils::mixer_label(&channel.name, true), x_pos, 0, 1, 1);
 
-                        let (scale, adjustment) = self.mixer_fader(card.id, channel);
+                        let (scale, volume_setting, scale_handle) =
+                            self.mixer_fader(card.id, channel);
                         grid.attach(&scale, x_pos, 1, 1, 1);
 
-                        if channel.has_switch {
-                            let cb =
+                        let (mute_handle, mute_button) = if channel.has_switch {
+                            let (cb, handle) =
                                 self.mixer_checkbox(card.id, channel.id, channel.is_playback);
                             grid.attach(&cb, x_pos, 2, 1, 1);
+                            (Some(handle), Some(cb))
+                        } else {
+                            (None, None)
                         };
 
                         x_pos += 1;
 
-                        // let handle = MixerHandle {
-                        //     card_id: card.id,
-                        //     element_id: channel.id,
-                        //     mute: cb_signal,
-                        //     volume: (adjustment, scale_signal),
-                        // };
-                        // handles.push(handle);
+                        let handle = MixerHandle {
+                            mute_handle,
+                            mute_button,
+                            volume_setting,
+                            scale_handle,
+                        };
+                        self.handles
+                            .write()
+                            .await
+                            .insert((card.id, channel.id), handle);
                     }
                 }
                 grid.attach(&Separator::new(Orientation::Vertical), x_pos, 0, 1, 4);
@@ -127,7 +182,7 @@ impl Mixer {
         card_id: i32,
         channel: u32,
         output: bool,
-    ) -> gtk::ToggleButton {
+    ) -> (gtk::ToggleButton, SignalHandlerId) {
         let builder = gtk::ToggleButtonBuilder::new();
         let image = if output {
             gtk::Image::from_icon_name(Some("audio-volume-muted-symbolic"), gtk::IconSize::Button)
@@ -143,27 +198,26 @@ impl Mixer {
             .image_position(gtk::PositionType::Bottom)
             .build();
         //button.set_active(model.connected_by_id(port1.id(), port2.id()));
-        utils::margin(&button,5);
+        utils::margin(&button, 5);
         button.set_halign(Align::Center);
 
         let model = self.rt.clone();
 
         let signal_id = button.connect_clicked(move |cb| {
-            // model
-            //     .lock()
-            //     .unwrap()
-            //     .get_pipe()
-            //     .send(Event::SetMuting(card_id, channel, cb.get_active()))
-            //     .unwrap();
+            model.sender().send(UiEvent::SetMuting(MuteCmd {
+                card: card_id,
+                channel,
+                mute: cb.get_active(),
+            }));
         });
-        button
+        (button, signal_id)
     }
 
     fn mixer_fader(
         &self,
         card_id: i32,
         chan: &MixerChannel,
-    ) -> (Scale, Adjustment) {
+    ) -> (Scale, Adjustment, SignalHandlerId) {
         let a = Adjustment::new(
             0.0,
             chan.volume_min as f64,
@@ -174,16 +228,15 @@ impl Mixer {
         );
 
         let model = self.rt.clone();
-        let chan_id = chan.id;
 
-        // let signal = a.connect_value_changed(move |a| {
-        //     // model
-        //     //     .lock()
-        //     //     .unwrap()
-        //     //     .get_pipe()
-        //     //     .send(Event::SetVolume(card_id, chan_id, a.get_value() as i64))
-        //     //     .unwrap()
-        // });
+        let channel = chan.id;
+        let signal = a.connect_value_changed(move |a| {
+            model.sender().send(UiEvent::SetVolume(VolumeCmd {
+                card: card_id,
+                channel,
+                volume: a.get_value() as i64,
+            }));
+        });
 
         let s = ScaleBuilder::new()
             .adjustment(&a)
@@ -195,6 +248,6 @@ impl Mixer {
             .digits(0)
             .build();
         s.set_value_pos(PositionType::Bottom);
-        (s, a)
+        (s, a, signal)
     }
 }

@@ -171,8 +171,12 @@ impl MainWindow {
                 // TODO: remove connection on audio matrix
                 // self.audio_matrix.rm_connection(a, b).await;
             }
-            UiCmd::MuteChange(m) => {}
-            UiCmd::VolumeChange(v) => {}
+            UiCmd::MuteChange(m) => {
+                self.mixer.update_mute(m.card, m.channel, m.mute).await;
+            }
+            UiCmd::VolumeChange(v) => {
+                self.mixer.update_volume(v.card, v.channel, v.volume).await;
+            }
             UiCmd::AddCard(c) => {
                 self.mixer.add_card(c).await;
             }
