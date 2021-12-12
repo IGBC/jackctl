@@ -3,8 +3,9 @@ use crate::model::{
     port::JackPortType,
 };
 use crate::rts::jack::JackRuntime;
+use async_std::task;
 use jack::Client;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub async fn do_event(jack: Arc<JackRuntime>) {
     loop {
@@ -20,7 +21,7 @@ pub async fn do_event(jack: Arc<JackRuntime>) {
             .unwrap();
 
         // this rate limits updates to the mixers, we don't need to update at 100 FPS
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        task::sleep(Duration::from_millis(100));
     }
 }
 
