@@ -127,14 +127,14 @@ pub(super) fn yes_no_dialog(
 }
 
 pub(super) fn card_query(vbox: &Box) -> (Label, Label, CheckButton) {
+    let check = CheckButton::with_label("Remember my choice for this device");
     let label1 = Label::new(Some("If you can read this, something broke :)"));
     let label2 = Label::new(Some( // TODO: investigate text wrapping
         "Activating this device will add it to the JACK connection graph \
          for use with other JACK clients. Only one sound system may use the device at a time so it \
          will become unavailable to non JACK applications",
     ));
-
-    let check = CheckButton::with_label("Remember my choice for this device");
+    label2.set_line_wrap(true);
 
     vbox.pack_start(&label1, true, false, 0);
     vbox.pack_start(&label2, true, false, 0);

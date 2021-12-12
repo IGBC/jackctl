@@ -71,6 +71,7 @@ impl CardQuery {
                     // Store the element
                     let l1 = format!("Activate sound device '{}'?", card.name);
                     this.label1.set_text(l1.as_str());
+                    this.inner.set_title(l1.as_str());
                     this.card.swap(Some(card));
                     Continue(true)
                 }
