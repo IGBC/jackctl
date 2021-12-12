@@ -1,4 +1,7 @@
-use crate::model::events::{JackCmd, JackEvent, JackSettings};
+use crate::model::{
+    events::{JackCmd, JackEvent, JackSettings},
+    port::JackPortType,
+};
 use crate::rts::jack::JackRuntime;
 use jack::Client;
 use std::sync::Arc;
@@ -31,7 +34,7 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 output,
                 connect,
             } => {
-                connect_ports(&jack.a_client.as_client(), &input, &output, connect);
+                connect_ports(&jack.a_client.as_client(), input, output, connect);
                 println!("Connect ports...");
             }
             JackCmd::Shutdown => {
@@ -42,15 +45,17 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
 }
 
 /// Connect two jack ports together on the server.
-fn connect_ports(client: &Client, input: &str, output: &str, connect: bool) {
-    let result = if connect {
-        client.connect_ports_by_name(&output, &input)
-    } else {
-        client.disconnect_ports_by_name(&output, &input)
-    };
-    if result.is_err() {
-        println!("Connection Error: {}", result.unwrap_err());
-    }
+fn connect_ports(client: &Client, input: JackPortType, output: JackPortType, connect: bool) {
+    // let result = if connect {
+    //     client.connect_ports_by_name(&output, &input)
+    // } else {
+    //     client.disconnect_ports_by_name(&output, &input)
+    // };
+    // if result.is_err() {
+    //     println!("Connection Error: {}", result.unwrap_err());
+    // }
+
+    todo!()
 }
 
 fn interval_update(jack: &Arc<JackRuntime>) -> JackSettings {

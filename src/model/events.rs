@@ -8,8 +8,8 @@ use jack::InternalClientID;
 #[derive(Clone)]
 pub enum JackCmd {
     ConnectPorts {
-        input: String,
-        output: String,
+        input: JackPortType,
+        output: JackPortType,
         connect: bool,
     },
     Shutdown,
@@ -79,7 +79,7 @@ pub enum UiEvent {
     /// The user told us about their sound card
     CardUsage(Card, bool),
     /// Add a connection between two ports
-    SetConnection(String, String, bool),
+    SetConnection(JackPortType, JackPortType, bool),
     /// The user has requested the program to end
     Shutdown,
 }

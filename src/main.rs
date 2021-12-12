@@ -1,5 +1,7 @@
 //! Jackctl main entrypoint
 
+#![allow(warnings)]
+
 mod cb_channel;
 mod error;
 mod model;

@@ -1,8 +1,12 @@
-use crate::{model::port::JackPortType, ui::UiRuntime};
+use crate::{
+    model::{events::UiEvent, port::JackPortType},
+    ui::UiRuntime,
+};
 use glib::{object::IsA, SignalHandlerId};
 use gtk::{
     prelude::BuilderExtManual, Adjustment, Align, Builder, ButtonExt, CheckButton, ContainerExt,
-    Grid, Label, LabelExt, ScrolledWindow, ScrolledWindowExt, Viewport, ViewportExt, WidgetExt, Widget,
+    Grid, Label, LabelExt, ScrolledWindow, ScrolledWindowExt, ToggleButtonExt, Viewport,
+    ViewportExt, Widget, WidgetExt,
 };
 
 pub(super) fn get_object<T>(builder: &Builder, name: &str) -> T
@@ -68,9 +72,9 @@ pub(super) fn mixer_label(text: &str, vertical: bool) -> Label {
 }
 
 pub(super) fn grid_checkbox(
-    _rt: UiRuntime,
-    _id1: &JackPortType,
-    _id2: &JackPortType,
+    rt: UiRuntime,
+    id1: JackPortType,
+    id2: JackPortType,
 ) -> (CheckButton, SignalHandlerId) {
     let button = CheckButton::new();
     button.set_margin_top(5);
@@ -79,8 +83,8 @@ pub(super) fn grid_checkbox(
     button.set_margin_end(5);
 
     let signal_id = button.connect_clicked(move |cb| {
-        // let state = cb.is_active();
-        // rt.sender().send(UiEvent::SetConnection(id1, id2, true));
+        let state = cb.get_active();
+        rt.sender().send(UiEvent::SetConnection(id1, id2, state));
     });
     (button, signal_id)
 }

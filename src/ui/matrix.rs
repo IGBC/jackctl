@@ -4,7 +4,8 @@ use crate::{
     ui::{pages::Pages, utils, UiRuntime},
 };
 use async_std::sync::RwLock;
-use gtk::{prelude::*, Align, Orientation, Separator};
+use glib::{ObjectExt, ObjectType, SignalHandlerId};
+use gtk::{prelude::*, Align, CheckButton, Orientation, Separator};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::atomic::{AtomicBool, Ordering},
@@ -19,7 +20,8 @@ struct PortStateElement {
 }
 
 type PortStateMap = BTreeMap<String, BTreeSet<PortStateElement>>;
-type PortState = RwLock<PortStateMap>;
+type CallbackMap = BTreeMap<(JackPortType, JackPortType), (CheckButton, SignalHandlerId)>;
+type Locked<T> = RwLock<T>;
 
 /// Count the number of clients and ports across all clients
 ///
@@ -33,8 +35,9 @@ fn count_map(map: &PortStateMap) -> (usize, usize) {
 }
 
 pub(super) struct Matrix {
-    _in: PortState,
-    out: PortState,
+    _in: Locked<PortStateMap>,
+    out: Locked<PortStateMap>,
+    callbacks: Locked<CallbackMap>,
     dirty: AtomicBool,
     rt: UiRuntime,
     page: &'static str,
@@ -46,6 +49,7 @@ impl Matrix {
             _in: Default::default(),
             out: Default::default(),
             dirty: AtomicBool::new(true),
+            callbacks: Default::default(),
             rt,
             page,
         }
@@ -72,12 +76,23 @@ impl Matrix {
         self.dirty.fetch_or(true, Ordering::Relaxed);
     }
 
+    /// Add a connection between two portsg
     pub async fn add_connection(&self, a: JackPortType, b: JackPortType) {
-        todo!()
+        self.toggle_state(a, b, true).await;
     }
 
+    /// Remove a connection between two ports
     pub async fn rm_connection(&self, a: JackPortType, b: JackPortType) {
-        todo!()
+        self.toggle_state(a, b, false).await;
+    }
+
+    async fn toggle_state(&self, a: JackPortType, b: JackPortType, state: bool) {
+        let mut cb_map = self.callbacks.write().await;
+        if let Some((btn, cb)) = cb_map.get_mut(&(a, b)) {
+            btn.block_signal(cb);
+            btn.set_active(state);
+            btn.unblock_signal(cb);
+        }
     }
 
     async fn is_empty(&self) -> bool {
@@ -149,6 +164,7 @@ impl Matrix {
             let mut curr_x = 2;
             let base_x = 2;
             let mut curr_y = 2;
+            let mut cb_map = self.callbacks.write().await;
 
             // Iterate over the horizontal clients list
             horz.iter().enumerate().for_each(|(_i, (client_x, set_x))| {
@@ -169,13 +185,15 @@ impl Matrix {
                                      port: port_y,
                                      ..
                                  }| {
-                                    let (cb, _) = utils::grid_checkbox(self.rt.clone(), id_x, id_y);
+                                    let (cb, id) =
+                                        utils::grid_checkbox(self.rt.clone(), *id_x, *id_y);
                                     cb.set_tooltip_text(Some(&format!(
                                         "{}:{} x {}:{}",
                                         client_x, port_x, client_y, port_y,
                                     )));
 
                                     grid.attach(&cb, curr_x, curr_y, 1, 1);
+                                    cb_map.insert((*id_x, *id_y), (cb, id));
                                     curr_x += 1;
                                 },
                             );
@@ -191,11 +209,13 @@ impl Matrix {
                 // Skip a row because of the divider
                 curr_y += 1;
             });
+
+            drop(cb_map);
         }
 
         self.dirty.fetch_and(false, Ordering::Relaxed);
 
         // Do magic things with grid
-        pages.insert_scrolled(self.page, dbg!(&grid));
+        pages.insert_scrolled(self.page, &grid);
     }
 }
