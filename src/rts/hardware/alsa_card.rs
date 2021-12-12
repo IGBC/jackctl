@@ -211,7 +211,7 @@ impl AlsaController {
             }
 
             for e in events.into_iter() {
-                self.event_tx.send(e).await.unwrap();
+                self.event_tx.send(e).await;
             }
 
             // this rate limits updates to the mixers, we don't need to update the volumes

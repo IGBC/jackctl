@@ -47,16 +47,22 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
 
 /// Connect two jack ports together on the server.
 fn connect_ports(client: &Client, input: JackPortType, output: JackPortType, connect: bool) {
-    // let result = if connect {
-    //     client.connect_ports_by_name(&output, &input)
-    // } else {
-    //     client.disconnect_ports_by_name(&output, &input)
-    // };
-    // if result.is_err() {
-    //     println!("Connection Error: {}", result.unwrap_err());
-    // }
-
-    todo!()
+    let i = client.port_by_id(input);
+    let o = client.port_by_id(output);
+    if i.is_some() && o.is_some() {
+        let o = o.unwrap();
+        let i = i.unwrap();
+        let result = if connect {
+            client.connect_ports(&o, &i)
+        } else {
+            client.disconnect_ports(&o, &i)
+        };
+        if result.is_err() {
+            println!("Connection Error: {}", result.unwrap_err());
+        }
+    } else {
+        println!("Failed to create connection {}->{}, one of the ports is missing", input, output);
+    }
 }
 
 fn interval_update(jack: &Arc<JackRuntime>) -> JackSettings {
