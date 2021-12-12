@@ -15,9 +15,20 @@ pub struct CardSettings {
 
 impl CardSettings {
     pub fn set_card_usage(&mut self, name: &String, _use: bool) {
-        if let Some(ref mut card) = self.known.get_mut(name) {
-            card._use = _use;
+        match self.known.get_mut(name) {
+            Some(entry) => entry._use = _use,
+            None => {
+                self.known.insert(
+                    name.clone(),
+                    SoundCard {
+                        name: name.clone(),
+                        _use,
+                    },
+                );
+            }
         }
+
+        println!("{:?}", self.known);
     }
 
     pub fn use_card(&self, name: &String) -> CardUsage {

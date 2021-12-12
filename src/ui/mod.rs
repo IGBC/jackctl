@@ -16,7 +16,7 @@ use crate::{
 };
 use async_std::channel::{bounded, Receiver, Sender};
 use gtk::{Application, Builder};
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 const GLADEFILE: &str = include_str!("../jackctl.glade");
 
@@ -47,6 +47,33 @@ impl EventSender {
                 println!("Failed to send event '{:?}'", e);
             }
         });
+    }
+}
+
+/// A channel to convey information about questions to the user
+#[derive(Clone)]
+struct Questionaire<T> {
+    tx: Sender<T>,
+    rx: Receiver<T>,
+}
+
+impl<T: Debug> Questionaire<T> {
+    pub fn new() -> Self {
+        let (tx, rx) = bounded(12);
+        Self { tx, rx }
+    }
+
+    pub fn send(&self, t: T) {
+        async_std::task::block_on(async {
+            let dbg = format!("Failed to send Questionaire<{:?}>", t);
+            if let Err(e) = self.tx.send(t).await {
+                println!("{}", dbg);
+            }
+        });
+    }
+
+    pub fn try_recv(&self) -> Option<T> {
+        self.rx.try_recv().ok()
     }
 }
 

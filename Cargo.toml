@@ -31,3 +31,4 @@ directories = "4.0"
 
 async-std = "1.0"
 futures = "0.3"
+atomptr = "1.1"

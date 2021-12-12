@@ -1,12 +1,18 @@
+use super::Questionaire;
 use crate::{
     model::{
+        card::Card,
         events::{JackSettings, UiCmd, UiEvent},
         port::{Port, PortType},
     },
     settings::Settings,
-    ui::{about::About, matrix::Matrix, mixer::Mixer, pages::Pages, utils, UiRuntime},
+    ui::{
+        about::About, card_query::CardQuery, matrix::Matrix, mixer::Mixer, pages::Pages, utils,
+        UiRuntime,
+    },
 };
 use async_std::task::block_on;
+use atomptr::AtomPtr;
 use gio::ApplicationExt;
 use glib::Continue;
 use gtk::{
@@ -18,6 +24,8 @@ use std::sync::{
     Arc,
 };
 
+pub(super) type CardQuestionaire = Arc<AtomPtr<Option<Questionaire<Card>>>>;
+
 pub struct MainWindow {
     app: Application,
     inner: Window,
@@ -28,6 +36,7 @@ pub struct MainWindow {
     audio_matrix: Matrix,
     midi_matrix: Matrix,
     mixer: Mixer,
+    cards: CardQuestionaire,
 }
 
 impl MainWindow {
@@ -55,6 +64,7 @@ impl MainWindow {
             pages,
             settings,
             app: app.clone(),
+            cards: Default::default(),
         };
 
         // hook up the main dialog
@@ -160,16 +170,21 @@ impl MainWindow {
             }
             UiCmd::AskCard(card) => {
                 println!("Ask the user whether we should use {:?}", card);
-                let _ = super::card_query::CardQuery::new(&self.app, &self.inner);
-                self.rt.sender().send(UiEvent::CardUsage(card, true));
+                match **self.cards.get_ref() {
+                    Some(ref q) => q.send(card),
+                    None => {
+                        let arc = Arc::clone(&self.cards);
+                        let cards = CardQuery::new(arc, self.rt.clone(), &self.app, &self.inner);
+                        cards.send(card);
+                        self.cards.swap(Some(cards));
+                    }
+                }
             }
             UiCmd::AddConnection(a, b) => {
-                // TODO: add connection on audio matrix
-                // self.audio_matrix.add_connection(a, b).await;
+                self.audio_matrix.add_connection(a, b).await;
             }
             UiCmd::DelConnection(a, b) => {
-                // TODO: remove connection on audio matrix
-                // self.audio_matrix.rm_connection(a, b).await;
+                self.audio_matrix.rm_connection(a, b).await;
             }
             UiCmd::MuteChange(m) => {
                 self.mixer.update_mute(m.card, m.channel, m.mute).await;

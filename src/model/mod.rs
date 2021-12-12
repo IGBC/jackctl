@@ -123,11 +123,24 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
                 .send_cmd(HardwareCmd::SetMixerVolume(volume))
                 .await
         }
-        CardUsage(card, yes) if yes => {
+        CardUsage { card, usage, store } if usage && store => {
+            println!("Use and store card {}", card.name);
             m.settings.w().cards().set_card_usage(&card.name, true);
+            m.settings.sync();
             signal_jack_card(card, m).await;
         }
-        CardUsage(Card { ref name, .. }, _) => m.settings.w().cards().set_card_usage(name, false),
+        CardUsage { card, usage, .. } if usage => {
+            println!("Use (but don't store!) card {}", card.name);
+            signal_jack_card(card, m).await;
+        }
+        CardUsage { card, store, .. } if store => {
+            println!("Done use and store card {}", card.name);
+            m.settings.w().cards().set_card_usage(&card.name, false);
+            m.settings.sync();
+        }
+        CardUsage { card, .. } => {
+            println!("User doesn't want to use or store card {}", card.name);
+        }
         SetConnection(input, output, connect) => {
             m.jack_handle
                 .send_cmd(JackCmd::ConnectPorts {

@@ -77,7 +77,11 @@ pub enum UiEvent {
     /// Called when the user requests a volume change on a channel
     SetVolume(VolumeCmd),
     /// The user told us about their sound card
-    CardUsage(Card, bool),
+    CardUsage {
+        card: Card,
+        usage: bool,
+        store: bool,
+    },
     /// Add a connection between two ports
     SetConnection(JackPortType, JackPortType, bool),
     /// The user has requested the program to end

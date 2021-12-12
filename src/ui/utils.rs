@@ -4,9 +4,10 @@ use crate::{
 };
 use glib::{object::IsA, SignalHandlerId};
 use gtk::{
-    prelude::BuilderExtManual, Adjustment, Align, Builder, ButtonExt, CheckButton, ContainerExt,
-    Grid, Label, LabelExt, ScrolledWindow, ScrolledWindowExt, ToggleButtonExt, Viewport,
-    ViewportExt, Widget, WidgetExt,
+    prelude::*, Adjustment, Align, Application, Box, BoxExt, Builder, ButtonExt, CheckButton,
+    ContainerExt, Dialog, DialogBuilder, DialogExt, DialogFlags, Grid, Label, LabelExt,
+    Orientation, ResponseType, ScrolledWindow, ScrolledWindowExt, ToggleButtonExt, Viewport,
+    ViewportExt, Widget, WidgetExt, Window,
 };
 
 pub(super) fn get_object<T>(builder: &Builder, name: &str) -> T
@@ -94,4 +95,50 @@ pub(super) fn margin<P: IsA<Widget>>(widget: &P, margin: i32) {
     widget.set_margin_start(margin);
     widget.set_margin_bottom(margin);
     widget.set_margin_end(margin);
+}
+
+pub(super) fn yes_no_dialog(
+    app: &Application,
+    parent: &Window,
+) -> (Dialog, Label, Label, CheckButton) {
+    let this = Dialog::with_buttons(
+        Some("If you can read this, something broke :)"),
+        Some(parent),
+        DialogFlags::all(),
+        &[("Yes", ResponseType::Yes), ("No", ResponseType::No)],
+    );
+    app.add_window(&this);
+    this.set_modal(true);
+    this.set_default_response(ResponseType::Yes);
+
+    let vbox = this.get_content_area();
+    vbox.set_orientation(Orientation::Vertical);
+    vbox.set_margin_start(15);
+    vbox.set_margin_end(15);
+    vbox.set_margin_top(15);
+    vbox.set_margin_bottom(5);
+    vbox.set_spacing(5);
+
+    let (l1, l2, cb) = card_query(&vbox);
+
+    this.add(&vbox);
+    this.resize(250, 250);
+    (this, l1, l2, cb)
+}
+
+pub(super) fn card_query(vbox: &Box) -> (Label, Label, CheckButton) {
+    let label1 = Label::new(Some("If you can read this, something broke :)"));
+    let label2 = Label::new(Some( // TODO: investigate text wrapping
+        "Activating this device will add it to the JACK connection graph \
+         for use with other JACK clients. Only one sound system may use the device at a time so it \
+         will become unavailable to non JACK applications",
+    ));
+
+    let check = CheckButton::with_label("Remember my choice for this device");
+
+    vbox.pack_start(&label1, true, false, 0);
+    vbox.pack_start(&label2, true, false, 0);
+    vbox.pack_start(&check, true, false, 0);
+
+    (label1, label2, check)
 }
