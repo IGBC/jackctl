@@ -1,5 +1,5 @@
 use crate::cb_channel::{self, ReturningReceiver, ReturningSender};
-use crate::model::card::{CardConfig, CardId, ChannelCount, MixerChannel, SampleRate, Volume};
+use crate::model::card::{CardConfig, ChannelCount, MixerChannel, SampleRate, Volume};
 use crate::model::events::{HardwareCardAction, HardwareCmd, HardwareEvent, MuteCmd, VolumeCmd};
 use alsa::card::Card;
 use alsa::card::Iter as CardIter;
@@ -13,6 +13,9 @@ use async_std::{
 };
 use std::collections::hash_map::HashMap;
 use std::sync::Arc;
+
+pub type CardId = i32;
+pub type ChannelId = (u32, String); //this is basically a selemID;
 
 const SAMPLE_RATES: [u32; 20] = [
     8000,   // Telephone Audio
@@ -77,6 +80,12 @@ pub struct AlsaController {
     known_cards: RwLock<HashMap<CardId, bool>>,
 }
 
+fn extract_selem(id: &SelemId) -> ChannelId {
+    let index = id.get_index();
+    let name = id.get_name().expect("could not get selemid name").to_owned();
+    (index, name)
+}
+
 impl AlsaHandle {
     pub fn new() -> Self {
         // Open the channels
@@ -117,12 +126,28 @@ impl AlsaController {
         // }
     }
 
+    fn print_mixer_hw(card: CardId) {
+        println!("============== Mixer for Card {} =================", card);
+        let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
+        for (id, elem) in mixer.iter().enumerate() {
+            let sid = Selem::new(elem).map(|s|{s.get_id()}).map(
+            |id|{
+                let i = id.get_index().clone();
+                let s = id.get_name().map(|v|{v.to_owned()}).map_err(|e|{e.to_string()}).clone();
+                (i, s)
+            });
+             
+            println!("{}: elem={:?}, selemId={:?}", id, elem, sid);
+        }
+        println!("============== End of Mixer =====================");
+    }
+
     async fn do_cmd(self: Arc<Self>) {
         while let Ok(event) = self.cmd_rx.recv().await {
             match event {
                 HardwareCmd::SetMixerVolume(volume) => {
                     let mixer = Mixer::new(&format!("hw:{}", volume.card), false).unwrap();
-                    let selemid = SelemId::new("", volume.channel);
+                    let selemid = SelemId::new(&volume.channel.1, volume.channel.0);
                     let selem = mixer.find_selem(&selemid).unwrap();
                     let playback = selem.has_playback_volume();
 
@@ -131,7 +156,7 @@ impl AlsaController {
 
                 HardwareCmd::SetMixerMute(mute) => {
                     let mixer = Mixer::new(&format!("hw:{}", mute.card), false).unwrap();
-                    let selemid = SelemId::new("", mute.channel);
+                    let selemid = SelemId::new(&mute.channel.1, mute.channel.0);
                     let selem = mixer.find_selem(&selemid).unwrap();
                     let playback = selem.has_playback_switch();
 
@@ -167,7 +192,7 @@ impl AlsaController {
                         Ok(mixer) => {
                             for (elem_id, elem) in mixer.iter().enumerate() {
                                 let selem = Selem::new(elem).unwrap();
-                                self.set_capture_volume(card, elem_id, elem, selem, &mut events);
+                                self.get_channel_volumes(card, selem, &mut events);
                             }
                         }
                         Err(e) => {
@@ -191,15 +216,13 @@ impl AlsaController {
 
             // this rate limits updates to the mixers, we don't need to update the volumes
             // at 100 FPS
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            task::sleep(std::time::Duration::from_millis(100));
         }
     }
 
-    fn set_capture_volume(
+    fn get_channel_volumes(
         self: &Arc<Self>,
-        card: &i32,
-        elem_id: usize,
-        elem: Elem<'_>,
+        card: &CardId,
         selem: Selem<'_>,
         events: &mut Vec<HardwareEvent>,
     ) {
@@ -208,16 +231,15 @@ impl AlsaController {
                 let mute = Self::get_muting(false, &selem);
                 events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                     card: *card,
-                    channel: elem_id as u32,
+                    channel: extract_selem(&selem.get_id()),
                     mute,
                 }));
             }
 
-            let selem = Selem::new(elem).unwrap();
             let volume = Self::get_volume(false, &selem);
             events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                 card: *card,
-                channel: elem_id as u32,
+                channel: extract_selem(&selem.get_id()),
                 volume,
             }));
         } else {
@@ -226,16 +248,15 @@ impl AlsaController {
                     let mute = Self::get_muting(true, &selem);
                     events.push(HardwareEvent::UpdateMixerMute(MuteCmd {
                         card: *card,
-                        channel: elem_id as u32,
+                        channel: extract_selem(&selem.get_id()),
                         mute,
                     }));
                 }
 
-                let selem = Selem::new(elem).unwrap();
                 let volume = Self::get_volume(true, &selem);
                 events.push(HardwareEvent::UpdateMixerVolume(VolumeCmd {
                     card: *card,
-                    channel: elem_id as u32,
+                    channel: extract_selem(&selem.get_id()),
                     volume,
                 }));
             }
@@ -358,7 +379,7 @@ impl AlsaController {
                     let volume = Self::get_volume(false, &s);
 
                     let mc = MixerChannel {
-                        id: mixer_id,
+                        id: extract_selem(&s.get_id()),
                         dirty: false,
                         name,
                         is_playback: false,
@@ -382,7 +403,7 @@ impl AlsaController {
                         let volume = Self::get_volume(true, &s);
 
                         let mc = MixerChannel {
-                            id: mixer_id,
+                            id: extract_selem(&s.get_id()),
                             dirty: false,
                             name,
                             is_playback: true,

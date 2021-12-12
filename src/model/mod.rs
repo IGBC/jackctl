@@ -183,7 +183,7 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
             let mut channels = HashMap::new();
 
             for c in mixerchannels.iter() {
-                channels.insert(c.id, c.to_owned());
+                channels.insert(c.id.clone(), c.to_owned());
             }
 
             let card = Card {
@@ -229,24 +229,13 @@ async fn handle_hw_ev(m: &mut Model, ev: HardwareEvent) {
             let c = m.cards.get_mut(&volume.card).unwrap();
             let chan = c.channels.get_mut(&volume.channel).unwrap();
             let oldv = chan.volume;
-            if volume.volume != oldv {
-                println!(
-                    "Volume Different {} - {}: {}",
-                    volume.volume, c.name, chan.name
-                );
-                chan.volume = volume.volume;
-                m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await;
-            }
+            m.ui_handle.send_cmd(UiCmd::VolumeChange(volume)).await;
         }
         UpdateMixerMute(mute) => {
             let c = m.cards.get_mut(&mute.card).unwrap();
             let chan = c.channels.get_mut(&mute.channel).unwrap();
             let oldm = chan.switch;
-            if mute.mute != oldm {
-                println!("Mute Different {} - {}: {}", mute.mute, c.name, chan.name);
-                chan.switch = mute.mute;
-                m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
-            }
+            m.ui_handle.send_cmd(UiCmd::MuteChange(mute)).await;
         }
     }
 }

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 // TODO: make this compatbile with different audio backends
-pub type CardId = i32;
-pub type ChannelId = u32;
+pub type CardId = crate::rts::hardware::CardId;
+pub type ChannelId = crate::rts::hardware::ChannelId;
 pub type Volume = i64;
 pub type SampleRate = u32;
 pub type ChannelCount = u32;
@@ -15,7 +15,7 @@ pub struct Card {
     pub capture: Option<CardConfig>, // option contains best sample rate
     pub playback: Option<CardConfig>, // option contains best sample rate
     pub name: String,
-    pub channels: HashMap<u32, MixerChannel>,
+    pub channels: HashMap<ChannelId, MixerChannel>,
     pub state: CardStatus,
 }
 
@@ -65,7 +65,7 @@ pub enum CardStatus {
 /// as by ALSA.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MixerChannel {
-    pub id: u32,
+    pub id: ChannelId,
     pub name: String,
 
     pub is_playback: bool,

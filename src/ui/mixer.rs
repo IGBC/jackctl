@@ -148,7 +148,7 @@ impl Mixer {
 
                         let (mute_handle, mute_button) = if channel.has_switch {
                             let (cb, handle) =
-                                self.mixer_checkbox(card.id, channel.id, channel.is_playback);
+                                self.mixer_checkbox(card.id, channel.id.clone(), channel.is_playback);
                             grid.attach(&cb, x_pos, 2, 1, 1);
                             (Some(handle), Some(cb))
                         } else {
@@ -166,7 +166,7 @@ impl Mixer {
                         self.handles
                             .write()
                             .await
-                            .insert((card.id, channel.id), handle);
+                            .insert((card.id, channel.id.clone()), handle);
                     }
                 }
                 grid.attach(&Separator::new(Orientation::Vertical), x_pos, 0, 1, 4);
@@ -180,7 +180,7 @@ impl Mixer {
     fn mixer_checkbox(
         &self,
         card_id: i32,
-        channel: u32,
+        channel: ChannelId,
         output: bool,
     ) -> (gtk::ToggleButton, SignalHandlerId) {
         let builder = gtk::ToggleButtonBuilder::new();
@@ -206,7 +206,7 @@ impl Mixer {
         let signal_id = button.connect_clicked(move |cb| {
             model.sender().send(UiEvent::SetMuting(MuteCmd {
                 card: card_id,
-                channel,
+                channel: channel.clone(),
                 mute: cb.get_active(),
             }));
         });
@@ -229,11 +229,11 @@ impl Mixer {
 
         let model = self.rt.clone();
 
-        let channel = chan.id;
+        let channel = chan.id.clone();
         let signal = a.connect_value_changed(move |a| {
             model.sender().send(UiEvent::SetVolume(VolumeCmd {
                 card: card_id,
-                channel,
+                channel: channel.clone(),
                 volume: a.get_value() as i64,
             }));
         });
