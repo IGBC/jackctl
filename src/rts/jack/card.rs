@@ -62,6 +62,6 @@ fn launch_card(
 fn stop_card(client: &Client, id: InternalClientID) {
     let result = client.unload_internal_client(id);
     if result.is_err() {
-        panic!("Failed to Stop card: {}", result.unwrap_err());
+        crate::log::oops(format!("Failed to Stop card: {}", result.unwrap_err()), 1);
     }
 }

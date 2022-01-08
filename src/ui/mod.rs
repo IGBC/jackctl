@@ -20,7 +20,7 @@ use std::{fmt::Debug, sync::Arc};
 
 const GLADEFILE: &str = include_str!("../jackctl.glade");
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UiHandle {
     tx_cmd: Sender<UiCmd>,
     rx_event: Receiver<UiEvent>,
@@ -59,7 +59,7 @@ struct Questionaire<T> {
 
 impl<T: Debug> Questionaire<T> {
     pub fn new() -> Self {
-        let (tx, rx) = bounded(12);
+        let (tx, rx) = bounded(128);
         Self { tx, rx }
     }
 
@@ -106,8 +106,8 @@ impl UiRuntime {
     }
 
     fn new() -> (Self, UiHandle) {
-        let (tx_cmd, rx_cmd) = bounded(8);
-        let (tx_event, rx_event) = bounded(8);
+        let (tx_cmd, rx_cmd) = bounded(128);
+        let (tx_event, rx_event) = bounded(128);
 
         (
             UiRuntime { tx_event, rx_cmd },

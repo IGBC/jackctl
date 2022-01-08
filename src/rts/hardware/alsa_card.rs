@@ -40,7 +40,7 @@ const SAMPLE_RATES: [u32; 20] = [
     384000, // DVD 8x (have never ever seen anything enumerate this fast)
 ];
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AlsaHandle {
     /// Send commands to the ALSA runtime
     cmd_tx: Sender<HardwareCmd>,
@@ -82,16 +82,19 @@ pub struct AlsaController {
 
 fn extract_selem(id: &SelemId) -> ChannelId {
     let index = id.get_index();
-    let name = id.get_name().expect("could not get selemid name").to_owned();
+    let name = id
+        .get_name()
+        .expect("could not get selemid name")
+        .to_owned();
     (index, name)
 }
 
 impl AlsaHandle {
     pub fn new() -> Self {
         // Open the channels
-        let (event_tx, event_rx) = bounded(4);
-        let (cmd_tx, cmd_rx) = bounded(4);
-        let (card_tx, card_rx) = cb_channel::bounded(4);
+        let (event_tx, event_rx) = bounded(128);
+        let (cmd_tx, cmd_rx) = bounded(128);
+        let (card_tx, card_rx) = cb_channel::bounded(128);
 
         Arc::new(AlsaController {
             cmd_rx,
@@ -130,13 +133,16 @@ impl AlsaController {
         println!("============== Mixer for Card {} =================", card);
         let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
         for (id, elem) in mixer.iter().enumerate() {
-            let sid = Selem::new(elem).map(|s|{s.get_id()}).map(
-            |id|{
+            let sid = Selem::new(elem).map(|s| s.get_id()).map(|id| {
                 let i = id.get_index().clone();
-                let s = id.get_name().map(|v|{v.to_owned()}).map_err(|e|{e.to_string()}).clone();
+                let s = id
+                    .get_name()
+                    .map(|v| v.to_owned())
+                    .map_err(|e| e.to_string())
+                    .clone();
                 (i, s)
             });
-             
+
             println!("{}: elem={:?}, selemId={:?}", id, elem, sid);
         }
         println!("============== End of Mixer =====================");
@@ -216,7 +222,7 @@ impl AlsaController {
 
             // this rate limits updates to the mixers, we don't need to update the volumes
             // at 100 FPS
-            task::sleep(std::time::Duration::from_millis(100));
+            task::sleep(std::time::Duration::from_millis(100)).await;
         }
     }
 
@@ -287,7 +293,7 @@ impl AlsaController {
                         {
                             Ok(_) => (),
                             Err(e) => {
-                                panic!("FATAL ERROR: ALSA Event tx - {}", e);
+                                crate::log::oops(format!("FATAL ERROR: ALSA Event tx - {}", e), 1);
                             }
                         }
                         cards.insert(id, true);
@@ -478,7 +484,10 @@ impl AlsaController {
             if channel.has_playback_volume() {
                 true
             } else {
-                panic!("Channel is both neither capture nor playback, you figure it out")
+                crate::log::oops(
+                    "Channel is both neither capture nor playback, you figure it out",
+                    1,
+                )
             }
         }
     }

@@ -39,7 +39,7 @@ impl JackNotificationController {
             match self.pipe.send(e).await {
                 Ok(_) => (),
                 Err(e) => {
-                    panic!("FATAL ERROR: JACK Async Event tx - {}", e);
+                    crate::log::oops(format!("FATAL ERROR: JACK Async Event tx - {}", e), 1);
                 }
             }
         });

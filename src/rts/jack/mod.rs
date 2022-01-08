@@ -16,7 +16,7 @@ use jack::{AsyncClient, Client as JackClient, InternalClientID};
 use std::sync::Arc;
 
 /// An easily clonable handle to the jack runtime
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JackHandle {
     /// Send commands to the jack runtime
     cmd_tx: Sender<JackCmd>,
@@ -84,9 +84,9 @@ impl JackRuntime {
         );
 
         // Open the channels
-        let (event_tx, event_rx) = bounded(4);
-        let (cmd_tx, cmd_rx) = bounded(4);
-        let (card_tx, card_rx) = cb_channel::bounded(4);
+        let (event_tx, event_rx) = bounded(128);
+        let (cmd_tx, cmd_rx) = bounded(128);
+        let (card_tx, card_rx) = cb_channel::bounded(128);
 
         // initialise jack
         let a_client = async_client::JackNotificationController::new(event_tx.clone());

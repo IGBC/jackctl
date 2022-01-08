@@ -21,7 +21,7 @@ pub async fn do_event(jack: Arc<JackRuntime>) {
             .unwrap();
 
         // this rate limits updates to the mixers, we don't need to update at 100 FPS
-        task::sleep(Duration::from_millis(100));
+        task::sleep(Duration::from_millis(100)).await;
     }
 }
 
