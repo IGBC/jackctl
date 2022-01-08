@@ -15,10 +15,10 @@ static JACKCTL_SPAWNED_SERVER: OnceCell<bool> = OnceCell::new();
 
 fn panic_kill(info: &panic::PanicInfo) -> ! {
     // logs "panicked at '$reason', src/main.rs:27:4" to the host stderr
-    eprintln!("{}", info);
+    error!("{}", info);
 
     if *JACKCTL_SPAWNED_SERVER.get().unwrap_or(&false) {
-        eprintln!("Killing Local Server");
+        error!("Killing Local Server");
         let _ = Command::new("killall").arg("-9").arg("jackd").spawn();
     }
 
@@ -31,14 +31,14 @@ impl JackServer {
             panic_kill(pi);
         }));
 
-        println!("process mananager new");
+        trace!("process mananager new");
         let jack_process = if process_is_running("jackd") || process_is_running("jackdbus") {
             None
         } else {
             // get the flag needed for realtime mode and a modifier for logging
             let (r_flag, r_msg) = if realtime { ("-R", "") } else { ("-r", "out") };
 
-            println!(
+            info!(
                 "starting jackd at {}Hz @{} frames with{} realtime",
                 rate, frames, r_msg
             );
@@ -78,7 +78,7 @@ impl JackServer {
     pub fn end(&mut self) {
         match &mut self.jack_process {
             Some(p) => {
-                println!("stopping server");
+                info!("stopping jack server");
                 let _ = p.kill();
                 let _ = p.wait();
             }
@@ -104,7 +104,8 @@ impl JackServer {
 
 impl Drop for JackServer {
     fn drop(&mut self) {
-        println!("Dropping jack server");
+        // FIXME: why does this never fire?
+        trace!("Dropping jack server");
         self.end();
     }
 }

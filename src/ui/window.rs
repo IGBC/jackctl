@@ -152,7 +152,7 @@ impl MainWindow {
                         .await
                 }
                 PortType::Unknown | _ => {
-                    println!("Unknown port type!");
+                    warn!("Unknown port type (if on pipewire, please report!)");
                 }
             },
             UiCmd::DelPort(port) => {}
@@ -169,7 +169,7 @@ impl MainWindow {
                 self.labels.update_cpu(cpu_percentage);
             }
             UiCmd::AskCard(card) => {
-                println!("Ask the user whether we should use {:?}", card);
+                trace!("Ask the user whether we should use {:?}", card);
                 match **self.cards.get_ref() {
                     Some(ref q) => q.send(card),
                     None => {

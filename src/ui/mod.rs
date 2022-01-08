@@ -32,7 +32,7 @@ impl UiHandle {
     }
     pub async fn send_cmd(&self, cmd: UiCmd) {
         if let Err(_) = self.tx_cmd.send(cmd).await {
-            println!("Failed to send UI command!");
+            error!("Failed to send UI command!");
         }
     }
 }
@@ -44,7 +44,7 @@ impl EventSender {
     fn send(self, e: UiEvent) {
         async_std::task::block_on(async move {
             if let Err(_) = self.0.send(e.clone()).await {
-                println!("Failed to send event '{:?}'", e);
+                error!("Failed to send event '{:?}'", e);
             }
         });
     }
@@ -67,7 +67,7 @@ impl<T: Debug> Questionaire<T> {
         async_std::task::block_on(async {
             let dbg = format!("Failed to send Questionaire<{:?}>", t);
             if let Err(e) = self.tx.send(t).await {
-                println!("{}", dbg);
+                error!("{}", dbg);
             }
         });
     }
@@ -118,7 +118,10 @@ impl UiRuntime {
 
 pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHandle) {
     if gtk::init().is_err() {
-        println!("Failed to start GTK, please ensure all dependancies are installed");
+        crate::log::oops(
+            "Failed to start GTK, please ensure all dependancies are installed",
+            1,
+        );
     }
 
     let (rt, handle) = UiRuntime::new();

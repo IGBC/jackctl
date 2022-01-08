@@ -6,7 +6,7 @@ use std::sync::Arc;
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
     // Loop until the card_tx senders drop
     while let Ok(card) = jack.card_rx.recv().await {
-        println!("Handling jack card event...");
+        debug!("Handling jack card event...");
         match card {
             (
                 JackCardAction::StartCard {
@@ -31,7 +31,7 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 r.reply(result).await.unwrap();
             }
             (JackCardAction::StopCard { id }, r) => {
-                println!("Stopping card {}", id);
+                info!("Stopping card {}", id);
                 stop_card(&jack.a_client.as_client(), id);
                 r.reply(Ok(0)).await.unwrap();
             }
@@ -54,8 +54,8 @@ fn launch_card(
         "-d hw:{} -r {} -p {} -n {} -q {} -i {} -o {}",
         id, rate, psize, nperiods, quality, in_ports, out_ports
     );
-    eprintln!("running audioadapter with: {}", args);
-    eprintln!("jack_load \"{}\" audioadapter -i \"{}\"", name, args);
+    trace!("running audioadapter with: {}", args);
+    trace!("jack_load \"{}\" audioadapter -i \"{}\"", name, args);
     client.load_internal_client(name, "audioadapter", &args)
 }
 

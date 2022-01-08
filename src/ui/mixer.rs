@@ -30,7 +30,7 @@ pub(super) struct Mixer {
 
 impl Mixer {
     pub fn new(rt: UiRuntime) -> Self {
-        println!("making mixer");
+        trace!("making mixer");
         Self {
             rt,
             dirty: AtomicBool::new(true),
@@ -40,7 +40,7 @@ impl Mixer {
     }
 
     pub async fn add_card(&self, card: Card) {
-        println!("adding card to mixer");
+        trace!("adding card to mixer");
         self.cards.write().await.insert(card.id, card);
         self.dirty.fetch_or(true, Ordering::Relaxed);
     }
@@ -66,7 +66,7 @@ impl Mixer {
                 button.set_active(mute);
                 button.unblock_signal(signal);
             } else {
-                println!("attempting to set mute on channel that doesn't have one");
+                error!("attempting to set mute on channel that doesn't have one");
             }
         })
         .await;
@@ -77,7 +77,8 @@ impl Mixer {
             Some(handle) => {
                 cb(handle);
             }
-            None => trace!("Attempt to set parameter on missing mixer thing"),
+            // This shouldn't happen but does anyway
+            None => trace!("[WARN]: Attempt to set parameter on missing mixer thing"),
         }
     }
 
@@ -86,7 +87,7 @@ impl Mixer {
             return;
         }
 
-        println!("drawing mixer");
+        trace!("drawing mixer");
         let cards = self.cards.read().await;
 
         let grid = utils::grid();

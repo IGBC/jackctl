@@ -115,7 +115,7 @@ impl JackRuntime {
 
     /// Bootstrap a smol runtime on a dedicated thread
     fn bootstrap(self: &Arc<Self>) {
-        println!("Running bootstrap...");
+        info!("Running bootstrap...");
         {
             let rt = Arc::clone(self);
             task::spawn(async move { cmd::spawn_handle(rt).await });

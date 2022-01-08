@@ -18,13 +18,13 @@ impl JackNotificationController {
             "32 bit float mono audio" => PortType::Audio,
             "8 bit raw midi" => PortType::Midi,
             e => {
-                println!("warning: Unknown port type: {}", e);
+                warn!("Unknown port type: {}", e);
                 PortType::Unknown
             }
         };
 
-        println!("=== {:?} ===", p.name());
-        let flags = dbg!(p.flags());
+        trace!("=== {:?} ===", p.name());
+        let flags = p.flags();
         let port_dir = if flags.contains(PortFlags::IS_OUTPUT) {
             PortDirection::Output
         } else {
@@ -48,17 +48,17 @@ impl JackNotificationController {
 
 impl NotificationHandler for JackNotificationController {
     fn client_registration(&mut self, _: &jack::Client, _name: &str, _is_registered: bool) {
-        eprintln!("EVENT: client_registration {}, {}", _name, _is_registered);
+        trace!("EVENT: client_registration {}, {}", _name, _is_registered);
     }
 
     fn port_registration(&mut self, c: &jack::Client, port_id: PortId, is_registered: bool) {
-        eprintln!("EVENT: port_registration {}, {}", port_id, is_registered);
+        trace!("EVENT: port_registration {}, {}", port_id, is_registered);
         if is_registered {
             // go get the corisponding port
             let jack_port = match c.port_by_id(port_id) {
                 Some(p) => p,
                 None => {
-                    eprintln!("ERROR: Jack just gave us a bad PortID");
+                    error!("Jack just gave us a bad PortID");
                     return;
                 }
             };
@@ -66,10 +66,7 @@ impl NotificationHandler for JackNotificationController {
             let name = match jack_port.name() {
                 Ok(n) => n,
                 Err(e) => {
-                    eprintln!(
-                        "ERROR: Jack refused to give name for port {}: {}",
-                        port_id, e
-                    );
+                    error!("Jack refused to give name for port {}: {}", port_id, e);
                     return;
                 }
             };
@@ -81,7 +78,7 @@ impl NotificationHandler for JackNotificationController {
             let (tt, dir) = match self.identify_port(&jack_port) {
                 Ok(pt) => pt,
                 Err(e) => {
-                    eprintln!("Error identifying port {} \"{}\": {}", port_id, name, e);
+                    error!("Error identifying port {} \"{}\": {}", port_id, name, e);
                     return;
                 }
             };
@@ -108,11 +105,13 @@ impl NotificationHandler for JackNotificationController {
         _old_name: &str,
         _new_name: &str,
     ) -> jack::Control {
-        eprintln!(
+        trace!(
             "EVENT: port_rename {}, {}, {}",
-            _port_id, _old_name, _new_name
+            _port_id,
+            _old_name,
+            _new_name
         );
-        eprintln!("Error: port renaming unimplemented");
+        error!("Port renaming unimplemented");
         jack::Control::Continue
     }
 
@@ -123,9 +122,11 @@ impl NotificationHandler for JackNotificationController {
         port_id_b: PortId,
         are_connected: bool,
     ) {
-        eprintln!(
+        trace!(
             "EVENT: ports_connected {}, {}, {}",
-            port_id_a, port_id_b, are_connected
+            port_id_a,
+            port_id_b,
+            are_connected
         );
         if are_connected {
             self.sync_send(JackEvent::AddConnection(port_id_b, port_id_a));
@@ -135,7 +136,7 @@ impl NotificationHandler for JackNotificationController {
     }
 
     fn xrun(&mut self, _: &jack::Client) -> jack::Control {
-        eprintln!("EVENT: XRun");
+        trace!("EVENT: XRun");
         self.sync_send(JackEvent::XRun);
         jack::Control::Continue
     }

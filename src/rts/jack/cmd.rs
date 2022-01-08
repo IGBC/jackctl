@@ -28,7 +28,7 @@ pub async fn do_event(jack: Arc<JackRuntime>) {
 pub async fn spawn_handle(jack: Arc<JackRuntime>) {
     // Loop until the card_tx senders drop
     while let Ok(cmd) = jack.cmd_rx.recv().await {
-        println!("Handling jack client event...");
+        debug!("Handling jack client event...");
         match cmd {
             JackCmd::ConnectPorts {
                 input,
@@ -36,7 +36,7 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 connect,
             } => {
                 connect_ports(&jack.a_client.as_client(), output, input, connect);
-                println!("Connect ports...");
+                trace!("Connect ports...");
             }
             JackCmd::Shutdown => {
                 break;
@@ -58,10 +58,10 @@ fn connect_ports(client: &Client, input: JackPortType, output: JackPortType, con
             client.disconnect_ports(&o, &i)
         };
         if result.is_err() {
-            println!("Connection Error: {}", result.unwrap_err());
+            error!("Connection: {}", result.unwrap_err());
         }
     } else {
-        println!("Failed to create connection {}->{}, one of the ports is missing", input, output);
+        error!("Failed to create connection {}->{}, one of the ports is missing", input, output);
     }
 }
 

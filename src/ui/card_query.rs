@@ -77,7 +77,7 @@ impl CardQuery {
                 }
                 None => {
                     // This means we should clean-up
-                    println!("No more card questions left...");
+                    trace!("No more card questions left...");
                     arc.swap(None);
                     this.inner.hide();
                     Continue(false)

@@ -34,5 +34,5 @@ fn main() {
 
     app.run(&args().collect::<Vec<_>>());
 
-    println!("Jackctl Exiting, Goodbye");
+    info!("Jackctl Exiting, Goodbye");
 }

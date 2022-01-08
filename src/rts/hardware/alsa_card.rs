@@ -58,7 +58,7 @@ impl AlsaHandle {
     // TODO: trait this
     pub async fn send_cmd(&self, cmd: HardwareCmd) {
         if let Err(_) = self.cmd_tx.send(cmd).await {
-            println!("Failed to send CMD to hardware runtime!");
+            error!("Failed to send CMD to hardware runtime!");
         }
     }
 
@@ -114,7 +114,7 @@ impl AlsaHandle {
 
 impl AlsaController {
     fn bootstrap(self: &Arc<Self>) {
-        println!("bootstrapping the alsas...");
+        info!("bootstrapping the alsas...");
         {
             let rt = Arc::clone(self);
             task::spawn(async move { rt.do_cmd().await });
@@ -130,7 +130,7 @@ impl AlsaController {
     }
 
     fn print_mixer_hw(card: CardId) {
-        println!("============== Mixer for Card {} =================", card);
+        trace!("============== Mixer for Card {} =================", card);
         let mixer = Mixer::new(&format!("hw:{}", card), false).unwrap();
         for (id, elem) in mixer.iter().enumerate() {
             let sid = Selem::new(elem).map(|s| s.get_id()).map(|id| {
@@ -143,9 +143,9 @@ impl AlsaController {
                 (i, s)
             });
 
-            println!("{}: elem={:?}, selemId={:?}", id, elem, sid);
+            trace!("{}: elem={:?}, selemId={:?}", id, elem, sid);
         }
-        println!("============== End of Mixer =====================");
+        trace!("============== End of Mixer =====================");
     }
 
     async fn do_cmd(self: Arc<Self>) {
@@ -203,7 +203,7 @@ impl AlsaController {
                         }
                         Err(e) => {
                             // OK card is gone, we expected this eventually;
-                            eprintln!("card{}: {}", card, e);
+                            error!("card{}: {}", card, e);
                             dropped_cards.push(*card);
                         }
                     }
@@ -212,7 +212,7 @@ impl AlsaController {
 
             for card in dropped_cards {
                 cards.remove(&card);
-                eprintln!("card{}: sending drop card event", card);
+                debug!("card{}: sending drop card event", card);
                 events.push(HardwareEvent::DropCard { id: card });
             }
 
@@ -299,12 +299,12 @@ impl AlsaController {
                         cards.insert(id, true);
                     }
                     Ok(None) => {
-                        eprintln!("Error: Card {} had no playback or capture channels", id);
+                        error!("Card {} had no playback or capture channels", id);
                         cards.insert(id, false);
                     }
                     Err(e) => {
                         cards.insert(id, false);
-                        eprintln!("Error: {}", e);
+                        error!("{}", e);
                     }
                 }
             }
@@ -316,7 +316,7 @@ impl AlsaController {
         while let Ok(event) = self.card_rx.recv().await {
             match event {
                 (e, m) => {
-                    println!("{:?}", (e, m));
+                    warn!("{:?}", (e, m));
                     todo!("Implement Card Events");
                 }
             }
@@ -371,7 +371,7 @@ impl AlsaController {
                 let s = Selem::new(channel).unwrap();
 
                 let name = s.get_id().get_name()?.to_string();
-                println!("Card {}, id {}, name: {}", id, mixer_id, name);
+                trace!("Card {}, id {}, name: {}", id, mixer_id, name);
 
                 if s.has_capture_volume() {
                     let (volume_min, volume_max) = s.get_capture_volume_range();
@@ -426,7 +426,7 @@ impl AlsaController {
 
             Ok(Some((inputs, outputs, channels, name)))
         } else {
-            println!("Failed to enumerate card {} - {} has no channels", id, name,);
+            error!("Failed to enumerate card {} - {} has no channels", id, name,);
             Ok(None)
         }
     }
@@ -466,7 +466,7 @@ impl AlsaController {
     }
 
     fn pick_best_rate(rates: &Vec<SampleRate>) -> SampleRate {
-        println!("WARNING: rate picking is not correctly implemented");
+        warn!("Rate picking is not correctly implemented");
         if rates.contains(&48000) {
             48000
         } else if rates.contains(&44100) {

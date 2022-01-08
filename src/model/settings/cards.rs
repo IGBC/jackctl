@@ -28,7 +28,7 @@ impl CardSettings {
             }
         }
 
-        println!("{:?}", self.known);
+        trace!("{:?}", self.known);
     }
 
     pub fn use_card(&self, name: &String) -> CardUsage {
