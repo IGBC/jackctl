@@ -181,10 +181,10 @@ impl MainWindow {
                 }
             }
             UiCmd::AddConnection(a, b) => {
-                self.audio_matrix.add_connection(a, b).await;
+                self.audio_matrix.add_connection(b, a).await;
             }
             UiCmd::DelConnection(a, b) => {
-                self.audio_matrix.rm_connection(a, b).await;
+                self.audio_matrix.rm_connection(b, a).await;
             }
             UiCmd::MuteChange(m) => {
                 self.mixer.update_mute(m.card, m.channel, m.mute).await;
