@@ -35,7 +35,7 @@ pub async fn spawn_handle(jack: Arc<JackRuntime>) {
                 output,
                 connect,
             } => {
-                connect_ports(&jack.a_client.as_client(), input, output, connect);
+                connect_ports(&jack.a_client.as_client(), output, input, connect);
                 println!("Connect ports...");
             }
             JackCmd::Shutdown => {
