@@ -1,14 +1,14 @@
 use crate::{
-    jack::JackController,
-    model::{Port, PortGroup},
+    model::{events::UiEvent, port::JackPortType},
+    ui::UiRuntime,
 };
 use glib::{object::IsA, SignalHandlerId};
 use gtk::{
-    prelude::BuilderExtManual, Adjustment, Align, Builder, ButtonExt, CheckButton, ContainerExt,
-    Grid, GridExt, Label, LabelExt, Orientation, ScrolledWindow, ScrolledWindowExt, Separator,
-    ToggleButtonExt, Viewport, ViewportExt, WidgetExt,
+    prelude::*, Adjustment, Align, Application, Box, BoxExt, Builder, ButtonExt, CheckButton,
+    ContainerExt, Dialog, DialogBuilder, DialogExt, DialogFlags, Grid, Label, LabelExt,
+    Orientation, ResponseType, ScrolledWindow, ScrolledWindowExt, ToggleButtonExt, Viewport,
+    ViewportExt, Widget, WidgetExt, Window,
 };
-use std::{cell::RefCell, rc::Rc};
 
 pub(super) fn get_object<T>(builder: &Builder, name: &str) -> T
 where
@@ -33,10 +33,6 @@ pub(super) fn grid() -> Grid {
 pub(super) fn wrap_scroll<P: IsA<gtk::Widget>>(widget: &P) -> ScrolledWindow {
     let vp = Viewport::new::<Adjustment, Adjustment>(None, None);
     vp.add(widget);
-    // vp.set_margin_top(10);
-    // vp.set_margin_start(10);
-    // vp.set_margin_bottom(10);
-    // vp.set_margin_end(10);
     vp.set_shadow_type(gtk::ShadowType::Out);
     let sw = ScrolledWindow::new::<Adjustment, Adjustment>(None, None);
     sw.add(&vp);
@@ -77,109 +73,72 @@ pub(super) fn mixer_label(text: &str, vertical: bool) -> Label {
 }
 
 pub(super) fn grid_checkbox(
-    jack: &Rc<RefCell<JackController>>,
-    port1: &Port,
-    port2: &Port,
+    rt: UiRuntime,
+    id1: JackPortType,
+    id2: JackPortType,
 ) -> (CheckButton, SignalHandlerId) {
     let button = CheckButton::new();
     button.set_margin_top(5);
     button.set_margin_start(5);
     button.set_margin_bottom(5);
     button.set_margin_end(5);
-    let clone = jack.clone();
-    let id1 = port1.id();
-    let id2 = port2.id();
+
     let signal_id = button.connect_clicked(move |cb| {
-        clone.borrow().connect_ports(id1, id2, cb.get_active());
+        let state = cb.get_active();
+        rt.sender().send(UiEvent::SetConnection(id1, id2, state));
     });
     (button, signal_id)
 }
 
-pub(super) fn generate_grid(
-    jack: &Rc<RefCell<JackController>>,
-    inputs: &PortGroup,
-    outputs: &PortGroup,
-) -> (Grid, Vec<(u32, u32, CheckButton, SignalHandlerId)>) {
-    let grid = grid();
+pub(super) fn margin<P: IsA<Widget>>(widget: &P, margin: i32) {
+    widget.set_margin_top(margin);
+    widget.set_margin_start(margin);
+    widget.set_margin_bottom(margin);
+    widget.set_margin_end(margin);
+}
 
-    if inputs.is_empty() || outputs.is_empty() {
-        let l = &grid_label("No ports are currently available.", false);
-        l.set_halign(Align::Center);
-        grid.attach(l, 0, 0, 1, 1);
+pub(super) fn yes_no_dialog(
+    app: &Application,
+    parent: &Window,
+) -> (Dialog, Label, Label, CheckButton) {
+    let this = Dialog::with_buttons(
+        Some("If you can read this, something broke :)"),
+        Some(parent),
+        DialogFlags::all(),
+        &[("Yes", ResponseType::Yes), ("No", ResponseType::No)],
+    );
+    app.add_window(&this);
+    this.set_modal(true);
+    this.set_default_response(ResponseType::Yes);
 
-        (grid, Vec::new())
-    } else {
-        let i_groups = inputs.no_groups();
-        let o_groups = outputs.no_groups();
-        let n_audio_inputs = inputs.len();
-        let n_audio_outputs = outputs.len();
-        let max_x: i32 = 2 + i_groups as i32 + n_audio_inputs as i32 - 1;
-        let max_y: i32 = 2 + o_groups as i32 + n_audio_outputs as i32 - 1;
+    let vbox = this.get_content_area();
+    vbox.set_orientation(Orientation::Vertical);
+    vbox.set_margin_start(15);
+    vbox.set_margin_end(15);
+    vbox.set_margin_top(15);
+    vbox.set_margin_bottom(5);
+    vbox.set_spacing(5);
 
-        let mut curr_x = 2;
-        for (i, g) in inputs.iter().enumerate() {
-            let l = grid_label(g.name(), true);
-            // Don't re-enable this, it causes a spacing bug
-            // TODO: Manual Word Wrapping.
-            //l.set_line_wrap(true);
-            grid.attach(&l, curr_x, 0, g.len() as i32, 1);
+    let (l1, l2, cb) = card_query(&vbox);
 
-            for n in g.iter() {
-                grid.attach(&grid_label(n.name(), true), curr_x, 1, 1, 1);
-                curr_x += 1;
-            }
+    this.add(&vbox);
+    this.resize(250, 250);
+    (this, l1, l2, cb)
+}
 
-            if i < i_groups - 1 {
-                grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
-                curr_x += 1;
-            }
-        }
+pub(super) fn card_query(vbox: &Box) -> (Label, Label, CheckButton) {
+    let check = CheckButton::with_label("Remember my choice for this device");
+    let label1 = Label::new(Some("If you can read this, something broke :)"));
+    let label2 = Label::new(Some( // TODO: investigate text wrapping
+        "Activating this device will add it to the JACK connection graph \
+         for use with other JACK clients. Only one sound system may use the device at a time so it \
+         will become unavailable to non JACK applications",
+    ));
+    label2.set_line_wrap(true);
 
-        let mut curr_y = 2;
-        for (i, g) in outputs.iter().enumerate() {
-            let l = grid_label(g.name(), false);
-            l.set_line_wrap(true);
-            grid.attach(&l, 0, curr_y, 1, g.len() as i32);
+    vbox.pack_start(&label1, true, false, 0);
+    vbox.pack_start(&label2, true, false, 0);
+    vbox.pack_start(&check, true, false, 0);
 
-            for n in g.iter() {
-                grid.attach(&grid_label(n.name(), false), 1, curr_y, 1, 1);
-                curr_y += 1;
-            }
-
-            if i < o_groups - 1 {
-                grid.attach(
-                    &Separator::new(Orientation::Horizontal),
-                    0,
-                    curr_y,
-                    max_x,
-                    1,
-                );
-                curr_y += 1;
-            }
-        }
-
-        let mut curr_x = 2;
-        let mut handles = Vec::new();
-        for g2 in inputs.iter() {
-            for n2 in g2.iter() {
-                let mut curr_y = 2;
-                for g1 in outputs.iter() {
-                    for n1 in g1.iter() {
-                        let (cb, handler) = grid_checkbox(&jack, n2, n1);
-                        grid.attach(&cb, curr_x, curr_y, 1, 1);
-
-                        handles.push((n1.id(), n2.id(), cb, handler));
-                        curr_y += 1;
-                    }
-                    // skip over the separator;
-                    curr_y += 1;
-                }
-                curr_x += 1;
-            }
-            // skip over the separator
-            curr_x += 1;
-        }
-
-        (grid, handles)
-    }
+    (label1, label2, check)
 }

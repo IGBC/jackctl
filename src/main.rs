@@ -1,38 +1,38 @@
+//! Jackctl main entrypoint
+
+#![allow(warnings)]
+
+#[macro_use]
+extern crate tracing;
+
+mod cb_channel;
 mod error;
-mod jack;
-mod mixer;
+mod log;
 mod model;
-mod process_manager;
-mod settings;
+mod rts;
 mod ui;
 
 use gio::prelude::*;
-use std::env::args;
+use model::{
+    settings::{self, Settings},
+    Model,
+};
+use std::{env::args, fs::File};
 
 fn main() {
+    log::parse_log_level();
+
     // Load and initialise settings first
     let dir = settings::scaffold();
-    let set = settings::Settings::init(dir.config_dir()).unwrap();
+    let set = Settings::init(dir.config_dir()).unwrap();
 
-    println!("{:?}", set.r().app());
+    let jack_if = rts::jack::JackRuntime::start(set.clone()).unwrap();
+    let card_if = rts::hardware::HardwareHandle::new();
+    let (_win, app, ui_if) = ui::create_ui(set.clone());
 
-    if gtk::init().is_err() {
-        println!("Failed to start GTK, please ensure all dependancies are installed");
-    }
-
-    // due to a bug this button is basically panic on demand, however it does the job.
-    ctrlc::set_handler(|| gtk::main_quit()).expect("Error setting Ctrl-C handler");
-
-    let model = model::ModelInner::new();
-
-    let proc_manager = process_manager::ProcessManager::new(model.clone());
-    let jack_controller = jack::JackController::new(model.clone());
-    let _alsa_controller = mixer::MixerController::new(model.clone());
-    let (window, app) = ui::init_ui(model.clone(), jack_controller.clone());
-    window.borrow().show();
+    Model::start(jack_if, ui_if, card_if, set);
 
     app.run(&args().collect::<Vec<_>>());
-    proc_manager.borrow_mut().end();
 
-    println!("Jackctl Exiting, Goodbye");
+    info!("Jackctl Exiting, Goodbye");
 }

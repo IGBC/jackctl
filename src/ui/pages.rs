@@ -23,7 +23,10 @@ impl Pages {
         }
     }
 
-    fn insert<T: IsA<Widget>>(&mut self, label: &str, child: &T) {
+    fn insert<T: IsA<Widget>>(&self, label: &str, child: &T) {
+        let curr = self.get_current();
+        self.remove_page(label);
+
         let pos = self
             .order
             .get(label)
@@ -34,22 +37,25 @@ impl Pages {
             Some(&Label::new(Some(label))),
             Some(*pos),
         );
+
+        self.show_all();
+        self.set_current(curr);
     }
 
     #[inline]
-    pub fn insert_scrolled<T: IsA<Widget>>(&mut self, label: &str, child: &T) {
+    pub fn insert_scrolled<T: IsA<Widget>>(&self, label: &str, child: &T) {
         self.insert(label, &utils::wrap_scroll(child));
     }
 
     #[inline]
-    pub fn insert_horizontal<T: IsA<Widget>>(&mut self, label: &str, child: &T) {
+    pub fn insert_horizontal<T: IsA<Widget>>(&self, label: &str, child: &T) {
         let horizontal = utils::wrap_scroll(child);
         horizontal.set_policy(PolicyType::Automatic, PolicyType::Never);
         self.insert(label, &horizontal);
     }
 
     /// Remove a page by label
-    pub fn remove_page(&mut self, label: &str) {
+    fn remove_page(&self, label: &str) {
         let pos = self
             .order
             .get(label)
@@ -72,7 +78,7 @@ impl Pages {
     }
 
     /// Set the current page
-    pub fn set_current<S: Into<String>>(&mut self, label: S) {
+    pub fn set_current<S: Into<String>>(&self, label: S) {
         let label = label.into();
         let pos = self
             .order
@@ -81,7 +87,7 @@ impl Pages {
         self.inner.set_current_page(Some(*pos));
     }
 
-    pub fn show_all(&mut self) {
+    pub fn show_all(&self) {
         self.inner.show_all();
     }
 }

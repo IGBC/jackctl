@@ -37,6 +37,8 @@
 //! [`sync()`](Settings::sync)!
 
 mod app;
+pub use app::{IoOrder, UiLaunchMode};
+
 mod cards;
 mod clients;
 mod jack;
@@ -62,7 +64,7 @@ pub fn scaffold() -> ProjectDirs {
 }
 
 /// Main settings tree
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Settings {
     base: PathBuf,
     app: RwLock<app::AppSettings>,
@@ -112,7 +114,11 @@ impl Settings {
     }
 
     /// Wait to get exclusive write access to any settings
-    pub fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
+    ///
+    /// This function can only be called from the `model` tree to
+    /// avoid having the UI randomly change settings.  All settings
+    /// changes _must_ be performed in the model
+    pub(in crate::model) fn w<'this>(self: &'this Arc<Self>) -> WriteSettings<'this> {
         WriteSettings { inner: self }
     }
 }
