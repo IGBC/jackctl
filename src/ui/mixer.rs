@@ -77,7 +77,7 @@ impl Mixer {
             Some(handle) => {
                 cb(handle);
             }
-            None => eprintln!("Attempt to set parameter on missing mixer thing"),
+            None => trace!("Attempt to set parameter on missing mixer thing"),
         }
     }
 

@@ -64,7 +64,7 @@ pub fn scaffold() -> ProjectDirs {
 }
 
 /// Main settings tree
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Settings {
     base: PathBuf,
     app: RwLock<app::AppSettings>,
