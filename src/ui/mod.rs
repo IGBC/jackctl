@@ -6,8 +6,10 @@ mod matrix;
 mod mixer;
 mod pages;
 mod utils;
+mod tray;
 mod window;
 
+use tray::TrayState;
 use window::MainWindow;
 
 use crate::{
@@ -116,7 +118,7 @@ impl UiRuntime {
     }
 }
 
-pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHandle) {
+pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHandle, TrayState) {
     if gtk::init().is_err() {
         crate::log::oops(
             "Failed to start GTK, please ensure all dependancies are installed",
@@ -126,6 +128,7 @@ pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHa
 
     let (rt, handle) = UiRuntime::new();
     let builder = Builder::from_string(GLADEFILE);
-    let (win, app) = window::create(settings, builder, rt);
-    (win, app, handle)
+    let (win, app) = window::create(settings, builder, rt.clone());
+    let tray = TrayState::new(rt, win.get_inner());
+    (win, app, handle, tray)
 }

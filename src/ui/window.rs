@@ -203,6 +203,10 @@ impl MainWindow {
             }
         }
     }
+
+    pub fn get_inner(&self) -> Window {
+        self.inner.clone()
+    }
 }
 
 /// UI state for various labels in the UI
