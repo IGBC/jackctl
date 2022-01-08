@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="7mm"
+   height="7mm"
+   viewBox="0 0 7.0000001 7.0000001"
+   version="1.1"
+   id="svg142"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   sodipodi:docname="jack_logo_1.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview144"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:pageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="true"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:snap-grids="false"
+     inkscape:zoom="11.485582"
+     inkscape:cx="11.623268"
+     inkscape:cy="12.276261"
+     inkscape:window-width="1920"
+     inkscape:window-height="1039"
+     inkscape:window-x="0"
+     inkscape:window-y="20"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer4"
+     units="mm" />
+  <defs
+     id="defs139">
+    <marker
+       style="overflow:visible"
+       id="Arrow1Lstart"
+       refX="0"
+       refY="0"
+       orient="auto"
+       inkscape:stockid="Arrow1Lstart"
+       inkscape:isstock="true">
+      <path
+         transform="matrix(0.8,0,0,0.8,10,0)"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:context-stroke;stroke-width:1pt"
+         d="M 0,0 5,-5 -12.5,0 5,5 Z"
+         id="path13551" />
+    </marker>
+    <linearGradient
+       id="linearGradient13421"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#fc0000;stop-opacity:1;"
+         offset="0"
+         id="stop13419" />
+    </linearGradient>
+  </defs>
+  <g
+     inkscape:groupmode="layer"
+     id="layer4"
+     inkscape:label="Clipping">
+    <circle
+       style="fill:#1f90f5;fill-opacity:1;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
+       id="path1426"
+       cx="3.5"
+       cy="3.5"
+       r="3.5" />
+    <path
+       id="circle1508"
+       style="fill:#f5f5f5;fill-opacity:1;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke markers fill"
+       d="M 7.2949219,1.4121094 A 13.228346,13.228346 0 0 0 1.4121094,7.2949219 l 5.515625,5.5156251 c 0.6534353,0.653482 0.6552472,0.653392 1.3085937,0 l 1.2402344,-1.242188 1.6347655,1.634766 2.091797,-2.091797 -1.634766,-1.6347655 1.242188,-1.2421875 c 0.653143,-0.65319 0.652963,-0.6536384 0,-1.3066406 z m 6.3652341,10.1562496 -2.091797,2.091797 1.503907,1.503906 2.091796,-2.091796 z m 1.960938,1.960938 -2.091797,2.091797 L 15.033203,17.125 17.125,15.033203 Z m 1.960937,1.960937 -2.091797,2.091797 0.261719,0.261719 0.490235,0.03125 1.732421,2.060547 L 19.345703,20 20,19.345703 19.935547,17.974609 17.875,16.242188 17.84375,15.751953 Z"
+       transform="scale(0.26458333)" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="View Layer"
+     style="display:inline;mix-blend-mode:multiply" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer5"
+     inkscape:label="Cut" />
+</svg>
