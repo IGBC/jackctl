@@ -907,23 +907,27 @@ checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "jack"
-version = "0.7.2"
-source = "git+https://github.com/IGBC/rust-jack?branch=main#f7e3ccf3ce27b1fd446efe7d9eb972d35a2231d8"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d2ac12f11bb369f3c50d24dbb9fdb00dc987434c9dd622a12c13f618106e153"
 dependencies = [
  "bitflags",
  "jack-sys",
  "lazy_static",
  "libc",
+ "log",
 ]
 
 [[package]]
 name = "jack-sys"
-version = "0.2.2"
-source = "git+https://github.com/IGBC/rust-jack?branch=main#f7e3ccf3ce27b1fd446efe7d9eb972d35a2231d8"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b91f2d2d10bc2bab38f4dfa4bc77123a988828af39dd3f30dd9db14d44f2cc1"
 dependencies = [
  "lazy_static",
  "libc",
  "libloading 0.6.7",
+ "pkg-config",
 ]
 
 [[package]]
