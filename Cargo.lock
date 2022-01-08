@@ -949,6 +949,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
