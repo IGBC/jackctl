@@ -49,7 +49,7 @@ impl CardQuery {
             let (store, usage) = match resp {
                 ResponseType::Yes => (this2.check.get_active(), true),
                 ResponseType::No => (this2.check.get_active(), false),
-                _ => unreachable!(),
+                _ => (false, false),
             };
 
             let r = this2.card.swap(None).consume();
