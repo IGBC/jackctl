@@ -125,13 +125,6 @@ fn on_activate(app: &Application) {
 }
 
 pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHandle, TrayState) {
-    if gtk::init().is_err() {
-        crate::log::oops(
-            "Failed to start GTK, please ensure all dependancies are installed",
-            1,
-        );
-    }
-
     // Load the compiled resource bundle
     let resource_data = glib::Bytes::from(&RESOURCES_BUNDLE[..]);
     let res = gio::Resource::from_data(&resource_data).unwrap();
@@ -139,10 +132,17 @@ pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHa
 
     let app = ApplicationBuilder::new()
         .application_id("jackctl.segfault")
-        .resource_base_path("/net/jackctl/Jackctl/")
+        .resource_base_path("/net/jackctl/Jackctl")
         .build();
 
     app.connect_activate(|app| on_activate(app));
+
+    if gtk::init().is_err() {
+        crate::log::oops(
+            "Failed to start GTK, please ensure all dependancies are installed",
+            1,
+        );
+    }
 
     let (rt, handle) = UiRuntime::new();
     let builder = Builder::from_resource("/net/jackctl/Jackctl/main.glade");
