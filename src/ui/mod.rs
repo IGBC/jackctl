@@ -5,8 +5,8 @@ mod card_query;
 mod matrix;
 mod mixer;
 mod pages;
-mod utils;
 mod tray;
+mod utils;
 mod window;
 
 use tray::TrayState;
@@ -17,10 +17,12 @@ use crate::{
     settings::Settings,
 };
 use async_std::channel::{bounded, Receiver, Sender};
-use gtk::{Application, Builder};
+use gio::ApplicationExt;
+use gtk::prelude::*;
+use gtk::{Application, ApplicationBuilder, Builder};
 use std::{fmt::Debug, sync::Arc};
 
-const GLADEFILE: &str = include_str!("../jackctl.glade");
+const RESOURCES_BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/resources.gresource"));
 
 #[derive(Clone, Debug)]
 pub struct UiHandle {
@@ -118,6 +120,10 @@ impl UiRuntime {
     }
 }
 
+fn on_activate(app: &Application) {
+    trace!("On Activate()")
+}
+
 pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHandle, TrayState) {
     if gtk::init().is_err() {
         crate::log::oops(
@@ -126,9 +132,21 @@ pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHa
         );
     }
 
+    // Load the compiled resource bundle
+    let resource_data = glib::Bytes::from(&RESOURCES_BUNDLE[..]);
+    let res = gio::Resource::from_data(&resource_data).unwrap();
+    gio::resources_register(&res);
+
+    let app = ApplicationBuilder::new()
+        .application_id("jackctl.segfault")
+        .resource_base_path("/net/jackctl/Jackctl/")
+        .build();
+
+    app.connect_activate(|app| on_activate(app));
+
     let (rt, handle) = UiRuntime::new();
-    let builder = Builder::from_string(GLADEFILE);
-    let (win, app) = window::create(settings, builder, rt.clone());
+    let builder = Builder::from_resource("/net/jackctl/Jackctl/main.glade");
+    let win = window::create(&app, settings, builder, rt.clone());
     let tray = TrayState::new(rt, win.get_inner());
     (win, app, handle, tray)
 }

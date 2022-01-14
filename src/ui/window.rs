@@ -303,13 +303,12 @@ impl Labels {
 }
 
 pub(super) fn create(
+    app: &Application,
     settings: Arc<Settings>,
     builder: Builder,
     rt: UiRuntime,
-) -> (Arc<MainWindow>, Application) {
-    let app = Application::new(Some("jackctl.segfault"), Default::default())
-        .expect("Failed to initialise Gtk application!");
-    let win = MainWindow::new(&app, settings, &builder, rt);
+) -> Arc<MainWindow> {
+    let win = MainWindow::new(app, settings, &builder, rt);
     win.setup_application(&app, builder);
-    (win, app)
+    win
 }

@@ -1,10 +1,10 @@
-use libappindicator::{AppIndicator, AppIndicatorStatus};
 use gtk::prelude::*;
 use gtk::Window;
+use libappindicator::{AppIndicator, AppIndicatorStatus};
 use std::path::Path;
 
-use crate::ui::UiRuntime;
 use crate::model::events::UiEvent;
+use crate::ui::UiRuntime;
 
 pub struct TrayState {
     indicator: AppIndicator,
@@ -16,8 +16,7 @@ impl TrayState {
 
         let mut indicator = AppIndicator::new("jackctl", "");
         indicator.set_status(AppIndicatorStatus::Active);
-        indicator.set_icon_theme_path(icon_path.to_str().unwrap());
-        indicator.set_icon_full("jackctl-symbolic", "icon");
+        indicator.set_icon("jackctl-symbolic");
         let mut m = gtk::Menu::new();
         let mi = gtk::CheckMenuItem::with_label("exit");
         mi.connect_activate(move |_| rt.sender().send(UiEvent::Shutdown));
@@ -30,8 +29,6 @@ impl TrayState {
         indicator.set_menu(&mut m);
         m.show_all();
 
-        Self {
-            indicator,
-        }
+        Self { indicator }
     }
 }

@@ -38,7 +38,7 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
     <property name="comments" translatable="yes">Wrangle Your Audio Professionally</property>
     <property name="website">https://gitlab.com/IGBC/jackctl</property>
     <property name="website-label" translatable="yes">Find us on Gitlab</property>
-    <property name="logo-icon-name">jackctl-symbolic</property>
+    <property name="logo-icon-name">jackctl-logo</property>
     <property name="license-type">gpl-3-0</property>
     <child internal-child="vbox">
       <object class="GtkBox">
@@ -153,7 +153,6 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
     <property name="name">maindialog</property>
     <property name="can-focus">False</property>
     <property name="modal">True</property>
-    <property name="icon">jackctl-symbolic.svg</property>
     <property name="urgency-hint">True</property>
     <property name="deletable">False</property>
     <child>
