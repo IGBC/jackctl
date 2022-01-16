@@ -2,8 +2,8 @@ use gio::compile_resources;
 
 fn main() {
     compile_resources(
-        "resources",
-        "resources/resources.xml",
+        "res",
+        "res/resources.xml",
         "resources.gresource",
     );
 }
