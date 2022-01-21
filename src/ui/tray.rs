@@ -35,13 +35,13 @@ impl TrayState {
         indicator.set_icon_theme_path(icon_path.to_str().unwrap());
         indicator.set_icon("jackctl-symbolic");
         let mut m = gtk::Menu::new();
-        let mi = gtk::CheckMenuItem::with_label("exit");
-        mi.connect_activate(move |_| rt.sender().send(UiEvent::Shutdown));
-        m.append(&mi);
-        let mi = gtk::CheckMenuItem::with_label("show");
+        let mi = gtk::MenuItem::with_label("Show");
         mi.connect_activate(move |_| {
             window.show();
         });
+        m.append(&mi);
+        let mi = gtk::MenuItem::with_label("Quit");
+        mi.connect_activate(move |_| rt.sender().send(UiEvent::Shutdown));
         m.append(&mi);
         indicator.set_menu(&mut m);
         m.show_all();
