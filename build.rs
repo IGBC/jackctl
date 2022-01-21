@@ -6,4 +6,5 @@ fn main() {
         "res/resources.xml",
         "resources.gresource",
     );
+    println!("cargo:rerun-if-changed=res");
 }
