@@ -4,9 +4,10 @@ use super::utils;
 use std::sync::Arc;
 
 use crate::model::settings::Settings;
+use crate::ui::UiRuntime;
+use crate::model::events::{UiEvent, UiSettingsUpdate};
 
-
-pub struct SettingsWindow {
+pub(super) struct SettingsWindow {
     window: Window,
     settings: Arc<Settings>,
 
@@ -21,7 +22,7 @@ pub struct SettingsWindow {
 const DP_OVERSAMPLE: f64 = 100.0;
 
 impl SettingsWindow {
-    pub fn new(settings: Arc<Settings>) -> Arc<Self> {
+    pub fn new(settings: Arc<Settings>, runtime: UiRuntime) -> Arc<Self> {
         let builder = Builder::from_resource("/net/jackctl/Jackctl/jack_settings.glade");
         let window = utils::get_object(&builder, "settingsDialog");
         
@@ -56,13 +57,24 @@ impl SettingsWindow {
         let settings_window = this.clone();
         save.connect_clicked(move|_|{
             info!("Saving Settings");
-            let p = settings_window.period_size.get_value();
-            let sr = settings_window.sample_rate.get_value();
-            let n = settings_window.n_periods.get_value();
-            let rt = settings_window.realtime_button.get_active();
-            let rq = settings_window.resample_q.get_value();
-
             settings_window.window.hide();
+
+            let period_size = settings_window.period_size.get_value().round() as u32;
+            let sample_rate = settings_window.sample_rate.get_value().round() as u32;
+            let n_periods = settings_window.n_periods.get_value().round() as u32;
+            let realtime = settings_window.realtime_button.get_active();
+            let resample_q = settings_window.resample_q.get_value().round() as u32;
+
+            let event = UiEvent::UpdateSettings(UiSettingsUpdate{
+                period_size,
+                sample_rate,
+                n_periods,
+                realtime,
+                resample_q,
+            });
+
+            runtime.sender().send(event);
+
         });
 
         this

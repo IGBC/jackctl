@@ -69,6 +69,20 @@ pub struct VolumeCmd {
     pub volume: Volume,
 }
 
+#[derive(Clone, Debug)]
+pub struct UiSettingsUpdate {
+    /// Enable jack realtime mode
+    pub realtime: bool,
+    /// Specify frames per period
+    pub period_size: u32,
+    /// periods of latency (in the hardware),
+    pub n_periods: u32,
+    /// Specify server sample rate
+    pub sample_rate: u32,
+    /// Quality at which to resample audio
+    pub resample_q: u32,
+}
+
 /// UI event types executed on the model
 #[derive(Clone, Debug)]
 pub enum UiEvent {
@@ -84,6 +98,8 @@ pub enum UiEvent {
     },
     /// Add a connection between two ports
     SetConnection(JackPortType, JackPortType, bool),
+    /// The user has updated the app settings
+    UpdateSettings(UiSettingsUpdate),
     /// The user has requested the program to end
     Shutdown,
 }

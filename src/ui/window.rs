@@ -57,6 +57,7 @@ impl MainWindow {
         quit.connect_clicked(move |_| rtt.sender().send(UiEvent::Shutdown));
 
         let settings_clone = settings.clone();
+        let rtt = rt.clone();
 
         let this = MainWindow {
             audio_matrix: Matrix::new(rt.clone(), "Matrix"),
@@ -69,7 +70,7 @@ impl MainWindow {
             settings,
             app: app.clone(),
             cards: Default::default(),
-            settings_window: SettingsWindow::new(settings_clone),
+            settings_window: SettingsWindow::new(settings_clone, rtt),
         };
 
         // hook up the main dialog

@@ -154,6 +154,18 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
                 })
                 .await
         }
+        UpdateSettings(settings) => {
+            info!("Saving User settings update");
+            let jack_settings = &mut m.settings.w().app().jack;
+            
+            jack_settings.realtime = settings.realtime;
+            jack_settings.period_size = settings.period_size;
+            jack_settings.n_periods = settings.n_periods;
+            jack_settings.sample_rate = settings.sample_rate;
+            jack_settings.resample_q = settings.resample_q;
+
+            m.settings.sync();
+        }
         Shutdown => {
             info!("=== Recieved Shutdown Event ===");
             end_program(m).await;

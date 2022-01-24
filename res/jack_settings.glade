@@ -101,7 +101,7 @@ All settings require a restart of JackCtl to take effect.</property>
               <object class="GtkLabel">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
-                <property name="tooltip-text" translatable="yes">The size of JACK's work unit. Increasing this setting gives your computer more time to complete audio processing, but will increase</property>
+                <property name="tooltip-text" translatable="yes">The size of JACK's work unit. Increasing this setting gives your computer more time to complete audio processing, but will increase the latency between sound being created, and being heard at the output.</property>
                 <property name="halign">end</property>
                 <property name="margin-start">5</property>
                 <property name="margin-end">5</property>
