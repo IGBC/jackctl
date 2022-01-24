@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/net/jackctl/Jackctl">
     <file>main.glade</file>
+    <file>jack_settings.glade</file>
     <file>icons/jackctl-logo.svg</file>
     <file>icons/jackctl-symbolic.svg</file>
   </gresource>

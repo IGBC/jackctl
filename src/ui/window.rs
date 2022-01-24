@@ -1,4 +1,5 @@
 use super::Questionaire;
+use super::settings::SettingsWindow;
 use crate::{
     model::{
         card::Card,
@@ -37,6 +38,7 @@ pub struct MainWindow {
     midi_matrix: Matrix,
     mixer: Mixer,
     cards: CardQuestionaire,
+    settings_window: Arc<SettingsWindow>,
 }
 
 impl MainWindow {
@@ -54,6 +56,8 @@ impl MainWindow {
         let rtt = rt.clone();
         quit.connect_clicked(move |_| rtt.sender().send(UiEvent::Shutdown));
 
+        let settings_clone = settings.clone();
+
         let this = MainWindow {
             audio_matrix: Matrix::new(rt.clone(), "Matrix"),
             midi_matrix: Matrix::new(rt.clone(), "MIDI"),
@@ -65,6 +69,7 @@ impl MainWindow {
             settings,
             app: app.clone(),
             cards: Default::default(),
+            settings_window: SettingsWindow::new(settings_clone),
         };
 
         // hook up the main dialog
@@ -72,7 +77,16 @@ impl MainWindow {
         let win = this.inner.clone();
         minimise.connect_clicked(move |_| win.hide());
 
-        Arc::new(this)
+        let arc = Arc::new(this);
+        let arc_clone = arc.clone();
+
+        let settings_button: Button = utils::get_object(&builder, "settingsButton");
+        settings_button.connect_clicked(move|_| {
+            trace!("Clicked settings button");
+            arc_clone.settings_window.show();
+        });
+
+        arc
     }
 
     /// This function sets up a bunch of Gtk state and must be called!
@@ -305,9 +319,9 @@ impl Labels {
 pub(super) fn create(
     app: &Application,
     settings: Arc<Settings>,
-    builder: Builder,
     rt: UiRuntime,
 ) -> Arc<MainWindow> {
+    let builder = Builder::from_resource("/net/jackctl/Jackctl/main.glade");
     let win = MainWindow::new(app, settings, &builder, rt);
     win.setup_application(&app, builder);
     win

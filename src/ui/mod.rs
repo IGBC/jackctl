@@ -8,6 +8,7 @@ mod pages;
 mod tray;
 mod utils;
 mod window;
+mod settings;
 
 use tray::TrayState;
 use window::MainWindow;
@@ -19,7 +20,7 @@ use crate::{
 use async_std::channel::{bounded, Receiver, Sender};
 use gio::ApplicationExt;
 use gtk::prelude::*;
-use gtk::{Application, ApplicationBuilder, Builder};
+use gtk::{Application, ApplicationBuilder};
 use std::{fmt::Debug, sync::Arc};
 
 const RESOURCES_BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/resources.gresource"));
@@ -145,8 +146,7 @@ pub fn create_ui(settings: Arc<Settings>) -> (Arc<MainWindow>, Application, UiHa
     }
 
     let (rt, handle) = UiRuntime::new();
-    let builder = Builder::from_resource("/net/jackctl/Jackctl/main.glade");
-    let win = window::create(&app, settings, builder, rt.clone());
+    let win = window::create(&app, settings, rt.clone());
     let tray = TrayState::new(rt, win.get_inner());
     (win, app, handle, tray)
 }

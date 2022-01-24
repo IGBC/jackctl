@@ -73,11 +73,11 @@ along with .  If not, see <http://www.gnu.org/licenses/>.
         <property name="can-focus">False</property>
         <property name="orientation">vertical</property>
         <child>
-          <object class="GtkModelButton">
+          <object class="GtkModelButton" id="settingsButton">
             <property name="visible">True</property>
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
-            <property name="text" translatable="yes">Setup ...</property>
+            <property name="text" translatable="yes">JACK Settings...</property>
           </object>
           <packing>
             <property name="expand">False</property>
