@@ -137,10 +137,10 @@ impl Matrix {
                     grid.attach(&l, curr_x2 as i32 + curr_x, 1, 1, 1);
                 });
 
-                if i < num_vert_clients - 1 {
-                    grid.attach(&Separator::new(Orientation::Vertical), curr_x, 0, 1, max_y);
-                }
                 curr_x += set.len() as i32 + 1;
+                if i < num_vert_clients - 1 {
+                    grid.attach(&Separator::new(Orientation::Vertical), curr_x-1, 0, 1, max_y);
+                }
             });
 
             // Draw horizontal labels
@@ -154,10 +154,10 @@ impl Matrix {
                     grid.attach(&l, 1, curr_y2 as i32 + curr_y, 1, 1);
                 });
 
-                if i < num_vert_clients - 1 {
-                    grid.attach(&Separator::new(Orientation::Vertical), 0, curr_x, max_x, 1);
-                }
                 curr_y += set.len() as i32 + 1;
+                if i < num_vert_clients - 1 {
+                    grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_y-1, max_x, 1);
+                }
             });
 
             // Draw checkboxes
