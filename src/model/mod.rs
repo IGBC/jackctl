@@ -156,14 +156,16 @@ async fn handle_ui_ev(m: &mut Model, ev: UiEvent) {
         }
         UpdateSettings(settings) => {
             info!("Saving User settings update");
-            let jack_settings = &mut m.settings.w().app().jack;
-            
-            jack_settings.realtime = settings.realtime;
-            jack_settings.period_size = settings.period_size;
-            jack_settings.n_periods = settings.n_periods;
-            jack_settings.sample_rate = settings.sample_rate;
-            jack_settings.resample_q = settings.resample_q;
+            {
+                let mut jack_settings = &mut m.settings.w().app().jack;
 
+                jack_settings.realtime = settings.realtime;
+                jack_settings.period_size = settings.period_size;
+                jack_settings.n_periods = settings.n_periods;
+                jack_settings.sample_rate = settings.sample_rate;
+                jack_settings.resample_q = settings.resample_q;
+            }
+            // jack settings must be fully out of scope before calling sync()
             m.settings.sync();
         }
         Shutdown => {
