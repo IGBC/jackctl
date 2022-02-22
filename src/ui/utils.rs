@@ -122,7 +122,7 @@ pub(super) fn yes_no_dialog(
     let (l1, l2, cb) = card_query(&vbox);
 
     this.add(&vbox);
-    this.resize(250, 250);
+    this.resize(380, 235);
     (this, l1, l2, cb)
 }
 

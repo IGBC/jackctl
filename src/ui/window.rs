@@ -50,7 +50,7 @@ impl MainWindow {
     ) -> Arc<Self> {
         let inner = utils::get_object(builder, "maindialog");
         let labels = Labels::new(builder, &rt);
-        let pages = Pages::new(builder, vec!["Matrix", "MIDI", "Mixer", "Setup"]);
+        let pages = Pages::new(builder, vec!["Audio Matrix", "MIDI Matrix", "Mixer", "Setup"]);
 
         let quit: ModelButton = utils::get_object(&builder, "quit.mainmenu");
         let rtt = rt.clone();
@@ -60,8 +60,8 @@ impl MainWindow {
         let rtt = rt.clone();
 
         let this = MainWindow {
-            audio_matrix: Matrix::new(rt.clone(), "Matrix"),
-            midi_matrix: Matrix::new(rt.clone(), "MIDI"),
+            audio_matrix: Matrix::new(rt.clone(), "Audio Matrix"),
+            midi_matrix: Matrix::new(rt.clone(), "MIDI Matrix"),
             mixer: Mixer::new(rt.clone()),
             rt,
             inner,
