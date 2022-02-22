@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Jack Control Panel
+Version=1.0
+Comment=Graphical User Interface for JACK Audio Server
+Exec=jackctl
+Icon=jackctl
+Categories=Audio;AudioVideo;Midi;X-Alsa;X-Jack;
+Keywords=Audio;MIDI;ALSA;JACK;
+Terminal=false
+Type=Application
+X-Window-Icon=jackctl
