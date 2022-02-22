@@ -60,8 +60,8 @@ impl JackServer {
                     ]
                     .iter(),
                 )
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
+                //.stdout(Stdio::piped())
+                //.stderr(Stdio::piped())
                 .spawn()
                 .expect("Failed to start jack server");
 

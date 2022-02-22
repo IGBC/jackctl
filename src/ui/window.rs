@@ -1,5 +1,5 @@
-use super::Questionaire;
 use super::settings::SettingsWindow;
+use super::Questionaire;
 use crate::{
     model::{
         card::Card,
@@ -50,7 +50,10 @@ impl MainWindow {
     ) -> Arc<Self> {
         let inner = utils::get_object(builder, "maindialog");
         let labels = Labels::new(builder, &rt);
-        let pages = Pages::new(builder, vec!["Audio Matrix", "MIDI Matrix", "Mixer", "Setup"]);
+        let pages = Pages::new(
+            builder,
+            vec!["Audio Matrix", "MIDI Matrix", "Mixer", "Setup"],
+        );
 
         let quit: ModelButton = utils::get_object(&builder, "quit.mainmenu");
         let rtt = rt.clone();
@@ -82,7 +85,7 @@ impl MainWindow {
         let arc_clone = arc.clone();
 
         let settings_button: Button = utils::get_object(&builder, "settingsButton");
-        settings_button.connect_clicked(move|_| {
+        settings_button.connect_clicked(move |_| {
             trace!("Clicked settings button");
             arc_clone.settings_window.show();
         });
@@ -170,7 +173,11 @@ impl MainWindow {
                     warn!("Unknown port type (if on pipewire, please report!)");
                 }
             },
-            UiCmd::DelPort(port) => {}
+            UiCmd::DelPort(port_id) => {
+                self.audio_matrix.rm_port(port_id).await;
+                self.midi_matrix.rm_port(port_id).await;
+            }
+
             UiCmd::IncrementXRun => self.labels.increment_xruns(),
             UiCmd::JackSettings(JackSettings {
                 cpu_percentage,
@@ -317,11 +324,7 @@ impl Labels {
     }
 }
 
-pub(super) fn create(
-    app: &Application,
-    settings: Arc<Settings>,
-    rt: UiRuntime,
-) -> Arc<MainWindow> {
+pub(super) fn create(app: &Application, settings: Arc<Settings>, rt: UiRuntime) -> Arc<MainWindow> {
     let builder = Builder::from_resource("/net/jackctl/Jackctl/main.glade");
     let win = MainWindow::new(app, settings, &builder, rt);
     win.setup_application(&app, builder);

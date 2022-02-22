@@ -1,11 +1,11 @@
-use gtk::prelude::*;
-use gtk::{ Builder, Window, Adjustment, Switch, Button, Label };
 use super::utils;
+use gtk::prelude::*;
+use gtk::{Adjustment, Builder, Button, Label, Switch, Window};
 use std::sync::Arc;
 
+use crate::model::events::{UiEvent, UiSettingsUpdate};
 use crate::model::settings::Settings;
 use crate::ui::UiRuntime;
-use crate::model::events::{UiEvent, UiSettingsUpdate};
 
 pub(super) struct SettingsWindow {
     window: Window,
@@ -25,7 +25,7 @@ impl SettingsWindow {
     pub fn new(settings: Arc<Settings>, runtime: UiRuntime) -> Arc<Self> {
         let builder = Builder::from_resource("/net/jackctl/Jackctl/jack_settings.glade");
         let window = utils::get_object(&builder, "settingsDialog");
-        
+
         let period_size: Adjustment = utils::get_object(&builder, "jackBlockSize");
         let sample_rate = utils::get_object(&builder, "jackSampleRate");
         let n_periods = utils::get_object(&builder, "jackPeriods");
@@ -34,7 +34,7 @@ impl SettingsWindow {
         let latency_view = utils::get_object(&builder, "jackSettingsLatencyDisplay");
 
         let save: Button = utils::get_object(&builder, "settingsSave");
-        
+
         let this = Arc::new(SettingsWindow {
             window,
             settings,
@@ -48,14 +48,17 @@ impl SettingsWindow {
         });
 
         let this_clone = this.clone();
-        this.period_size.connect_value_changed(move|_|{this_clone.update_latency()});
+        this.period_size
+            .connect_value_changed(move |_| this_clone.update_latency());
         let this_clone = this.clone();
-        this.sample_rate.connect_value_changed(move|_|{this_clone.update_latency()});
+        this.sample_rate
+            .connect_value_changed(move |_| this_clone.update_latency());
         let this_clone = this.clone();
-        this.n_periods.connect_value_changed(move|_|{this_clone.update_latency()});
-        
+        this.n_periods
+            .connect_value_changed(move |_| this_clone.update_latency());
+
         let settings_window = this.clone();
-        save.connect_clicked(move|_|{
+        save.connect_clicked(move |_| {
             info!("Saving Settings");
             settings_window.window.hide();
 
@@ -65,7 +68,7 @@ impl SettingsWindow {
             let realtime = settings_window.realtime_button.get_active();
             let resample_q = settings_window.resample_q.get_value().round() as u32;
 
-            let event = UiEvent::UpdateSettings(UiSettingsUpdate{
+            let event = UiEvent::UpdateSettings(UiSettingsUpdate {
                 period_size,
                 sample_rate,
                 n_periods,
@@ -74,7 +77,6 @@ impl SettingsWindow {
             });
 
             runtime.sender().send(event);
-
         });
 
         this
@@ -85,7 +87,7 @@ impl SettingsWindow {
 
         let jack_settings = &app_settings.jack;
         jack_settings.sample_rate;
-        
+
         // update settings menu from file
         self.period_size.set_value(jack_settings.period_size as f64);
         self.sample_rate.set_value(jack_settings.sample_rate as f64);
@@ -104,7 +106,7 @@ impl SettingsWindow {
         let n = self.n_periods.get_value();
 
         let latency_s = (p * n) / sr;
-        let latency_ms = ((latency_s * 1000.0 * DP_OVERSAMPLE).round())/DP_OVERSAMPLE;
+        let latency_ms = ((latency_s * 1000.0 * DP_OVERSAMPLE).round()) / DP_OVERSAMPLE;
 
         self.latency_view.set_markup(&format!("{}ms", latency_ms));
     }

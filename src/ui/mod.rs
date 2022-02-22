@@ -5,10 +5,10 @@ mod card_query;
 mod matrix;
 mod mixer;
 mod pages;
+mod settings;
 mod tray;
 mod utils;
 mod window;
-mod settings;
 
 use tray::TrayState;
 use window::MainWindow;

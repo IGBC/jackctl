@@ -148,8 +148,11 @@ impl Mixer {
                         grid.attach(&scale, x_pos, 1, 1, 1);
 
                         let (mute_handle, mute_button) = if channel.has_switch {
-                            let (cb, handle) =
-                                self.mixer_checkbox(card.id, channel.id.clone(), channel.is_playback);
+                            let (cb, handle) = self.mixer_checkbox(
+                                card.id,
+                                channel.id.clone(),
+                                channel.is_playback,
+                            );
                             grid.attach(&cb, x_pos, 2, 1, 1);
                             (Some(handle), Some(cb))
                         } else {

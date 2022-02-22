@@ -12,7 +12,7 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct PortStateElement {
     is_hw: bool,
     port: String,
@@ -74,6 +74,38 @@ impl Matrix {
             .or_default()
             .insert(PortStateElement { is_hw, port, id });
         self.dirty.fetch_or(true, Ordering::Relaxed);
+    }
+
+    pub async fn rm_port(&self, id: JackPortType) {
+        let mut _in = self._in.write().await;
+        self.rm_port_inner(id, &mut _in);
+        let mut out = self.out.write().await;
+        self.rm_port_inner(id, &mut out);
+        self.dirty.fetch_or(true, Ordering::Relaxed);
+    }
+
+    fn rm_port_inner(&self, id: JackPortType, state: &mut PortStateMap) {
+        let mut clients_to_remove = Vec::new();
+
+        for (client_name, client) in state.iter_mut() {
+            let ports_to_remove: Vec<PortStateElement> = client
+                .iter()
+                .filter(|port| port.id == id)
+                .map(|port| port.clone())
+                .collect();
+
+            for p in ports_to_remove {
+                client.remove(&p);
+            }
+
+            if client.is_empty() {
+                clients_to_remove.push(client_name.to_owned());
+            }
+        }
+
+        for c in clients_to_remove {
+            state.remove(&c);
+        }
     }
 
     /// Add a connection between two portsg
@@ -139,7 +171,13 @@ impl Matrix {
 
                 curr_x += set.len() as i32 + 1;
                 if i < num_vert_clients - 1 {
-                    grid.attach(&Separator::new(Orientation::Vertical), curr_x-1, 0, 1, max_y);
+                    grid.attach(
+                        &Separator::new(Orientation::Vertical),
+                        curr_x - 1,
+                        0,
+                        1,
+                        max_y,
+                    );
                 }
             });
 
@@ -156,7 +194,13 @@ impl Matrix {
 
                 curr_y += set.len() as i32 + 1;
                 if i < num_vert_clients - 1 {
-                    grid.attach(&Separator::new(Orientation::Horizontal), 0, curr_y-1, max_x, 1);
+                    grid.attach(
+                        &Separator::new(Orientation::Horizontal),
+                        0,
+                        curr_y - 1,
+                        max_x,
+                        1,
+                    );
                 }
             });
 

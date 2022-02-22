@@ -61,7 +61,10 @@ fn connect_ports(client: &Client, input: JackPortType, output: JackPortType, con
             error!("Connection: {}", result.unwrap_err());
         }
     } else {
-        error!("Failed to create connection {}->{}, one of the ports is missing", input, output);
+        error!(
+            "Failed to create connection {}->{}, one of the ports is missing",
+            input, output
+        );
     }
 }
 
